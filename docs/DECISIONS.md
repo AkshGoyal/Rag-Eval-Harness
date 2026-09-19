@@ -14,6 +14,7 @@ isn't in this file, that's a bug in our process.
 | D-002 | Commits authored as Aksh, Claude as co-author | 1 | 2026-09-19 | active |
 | D-003 | Corpus is CUAD (510 annotated contracts, CC BY 4.0) | 2 | 2026-09-19 | active |
 | D-004 | Generic harness first, adapter for Aksh's chatbot second | 0 | 2026-09-19 | active |
+| D-005 | Asymmetric cross-provider models: Gemini generator, OpenAI judge | 1 | 2026-09-19 | active |
 
 Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
@@ -152,6 +153,76 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
   implements it, and check it against what Aksh's chatbot can actually emit. If the
   interface needs CUAD-specific fields, the boundary is wrong.
 - **When to revisit:** after Milestone A, when the interface has met real data.
+- **Date:** 2026-09-19
+
+---
+
+## D-005 — Generator and judge come from different providers
+
+- **Decision:** the reference pipeline uses **different model families for generation and
+  judging**, both from the cheap tier:
+  - **Generator:** Gemini Flash tier — free tier first (Google AI Studio, ~1,000–1,500
+    requests/day), paid **Gemini 3.1 Flash-Lite** ($0.25/$1.50 per 1M) as overflow.
+  - **Judge:** **GPT-4o-mini** ($0.15/$0.60 per 1M), on the OpenAI key Aksh already has.
+  - **Embeddings:** OpenAI `text-embedding-3-small` ($0.02/1M) — ₹12 to index the entire
+    corpus, and no third provider to integrate.
+
+  Exact model IDs are verified against provider docs at Phase 4, not fixed here.
+
+- **Context:** ₹1000 total for the project. Aksh's initial answer named GPT-4o and OpenAI
+  embeddings, but that described his existing chatbot rather than a constraint here; he
+  then confirmed any provider is acceptable. A survey of current pricing found a ~70×
+  spread between the cheapest usable models and GPT-4o, which changes what is affordable
+  rather than merely what is cheaper.
+
+- **Alternatives considered:**
+  - *GPT-4o for both* — rejected on arithmetic: ~₹520 per 100-case A/B, so the entire
+    budget buys 1.9 runs including all development. Not a preference, a wall.
+  - *One cheap model for both (e.g. GPT-4o-mini)* — rejected, though viable at ~₹31/run.
+    A judge scoring answers from its own model family exhibits self-preference bias, and
+    with cross-provider costing ~₹35/run there is no longer a price reason to accept it.
+  - *Claude Haiku 4.5* — rejected on price for this role: at $1/$5 per 1M it is roughly
+    10× the Gemini Flash-Lite tier and ~₹220 per A/B run.
+  - *Cheapest available (Qwen3.7 Flash, Ling 3.0 Flash, ~$0.02–0.03/1M)* — rejected for
+    the judge role specifically, and unverified. A judge must emit schema-valid JSON on
+    essentially every call; a model that fails validation on a meaningful fraction of
+    calls costs retries and contaminates results. Cheapest is a false economy here.
+  - *Gemini 2.5 Flash-Lite ($0.10/$0.40)* — rejected despite being cheaper than 3.1:
+    it is scheduled for retirement on 16 October 2026. Building on a model with weeks
+    left is a self-inflicted migration.
+
+- **Why this one:** splitting the providers makes self-preference bias *structurally
+  impossible* rather than something to measure and correct — the judge cannot favour its
+  own output because it never produced it. That property used to cost ₹305/run under a
+  single-provider assumption; here it costs about ₹14. The asymmetry also matches what
+  the two roles need: the generator should be cheap and not especially strong, because a
+  powerful generator compensates for bad retrieval using prior knowledge and hides
+  exactly the differences we are trying to measure, while the judge needs reliable
+  instruction-following and valid structured output.
+
+- **Risks / failure modes:** (1) two providers means two keys, two failure modes, two
+  rate-limit regimes, and a provider wrapper that must genuinely abstract both;
+  (2) Gemini's free tier runs at 5–15 requests/minute, so a 400-request run takes 30–80
+  minutes — tolerable once, painful if the cache is not working; (3) free-tier inputs may
+  be used for product improvement, acceptable for public CUAD text but not for anything
+  else, and a constraint to re-check before the Phase 14 adapter sends any other corpus;
+  (4) free-tier availability and quotas vary by region and change without notice;
+  (5) cross-provider comparison assumes both models are competent at the task — if the
+  Gemini generator is simply bad on legal prose, scores collapse to a floor and configs
+  become indistinguishable.
+
+- **How we'd detect it:** (2) and (4) surface as throughput collapse or 429s during a
+  run, which the structured logs record per case rather than hiding in a retry;
+  (5) is the same tripwire as D-003 — if the seed set scores near zero for every config,
+  the generator, not the retrieval, is the problem. The cost model in this entry is
+  checkable against the recorded spend in any run manifest; a large divergence means the
+  token assumptions were wrong.
+
+- **When to revisit:** if Gemini's free tier changes or is unavailable from India; if
+  calibration (Phase 9) shows GPT-4o-mini disagreeing with Aksh's labels too often, in
+  which case a stronger judge is paid for out of the reserve rather than assumed; or if
+  the seed set shows a floor effect.
+
 - **Date:** 2026-09-19
 
 ---

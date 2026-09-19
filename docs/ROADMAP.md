@@ -2,9 +2,8 @@
 
 **Current phase:** Phase 1 — Stack and model tier selection (in progress)
 **Last updated:** 2026-09-19
-**Next action:** decide the model tier for the reference pipeline's generator and judge
-under the fixed ₹1000 total budget (D-005, pending). Corpus, scope, labelling budget
-and provider are settled — see D-003, D-004 and the constraints below.
+**Next action:** Phase 1 stack selection — language, config format, vector store, test
+runner. Corpus, scope, labelling budget, models and budget are settled (D-003 to D-005).
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.
@@ -52,21 +51,36 @@ adjustment.
 | Total budget | **₹1000 (~$11–12), all costs** | Model tier is a budget decision, not a quality one. A hard in-code spend cap is required before the first uncached LLM call. |
 | Aksh's manual labelling time | **30–60 minutes, total** | Test cases are derived from CUAD annotations and spot-checked, never hand-authored. Judge calibration gets one overall agreement number, not per-category. |
 | Corpus | CUAD, CC BY 4.0 (D-003) | Retrieval labels come free from expert annotations. |
-| Provider | OpenAI (Aksh's existing access) | Single provider behind the wrapper; swapping is a config change, not a rewrite. |
+| Models | Gemini Flash generator, GPT-4o-mini judge (D-005) | Two providers behind one wrapper. Self-preference bias is structurally impossible, not merely measured. |
 | Scope order | Generic harness, then adapter (D-004) | The harness never depends on any particular RAG system. |
 
-### What the budget rules out
+### What the budget actually buys
 
-At GPT-4o rates a judged case costs roughly $0.03 all-in. ₹1000 buys about 380 of
-them — a single two-config comparison over 100 cases, with nothing left for the
-iteration, mistakes and repeated runs that the work actually requires. The generator
-and judge therefore run on a cheap tier by default, and any escalation is paid for out
-of a reserved slice and justified by calibration evidence rather than assumed.
+Costed against measured CUAD statistics (510 contracts, ~8,000 words each, ~5.5M tokens
+total) rather than guessed ones, with a Gemini Flash-Lite generator and a GPT-4o-mini
+judge. Conversion at ~₹88/$.
 
-The larger financial risk is not per-token price but accidental spend: a retry loop, or
-re-indexing the full corpus repeatedly. That is what the Phase 5 budget cap and the
-response cache exist to prevent, which raises their priority — **no uncached LLM call
-should ever be made in this project.**
+| Retrieval config | Generator context | **₹ per 100-case A/B run** |
+|---|---|---|
+| 256 tokens × top-4 | 1,374 | ₹24 |
+| 512 tokens × top-5 (benchmark default) | 2,910 | **₹35** |
+| 1024 tokens × top-5 | 5,470 | ₹53 |
+| 512 tokens × top-20 (wide, reranked) | 10,590 | ₹89 |
+
+Indexing the whole corpus once costs ₹12 on OpenAI embeddings, ₹4 on Google's.
+
+The important property is that the conclusion is **insensitive to the configuration**:
+even the widest retrieval setting leaves room for roughly ten full A/B runs inside the
+budget. Retrieval configuration can therefore be chosen on quality grounds alone, which
+is the point of the harness.
+
+By contrast, GPT-4o for both roles costs ~₹520 per run — 1.9 runs for the entire
+project. The cheap tier is what makes iteration possible at all.
+
+The remaining financial risk is not per-token price but accidental spend: a retry loop,
+or re-indexing the corpus repeatedly. That is what the Phase 5 budget cap and response
+cache exist to prevent, which raises their priority — **no uncached LLM call should ever
+be made in this project.**
 
 ---
 
@@ -105,6 +119,12 @@ should ever be made in this project.**
   script plus hashes, not the documents); a corpus so well memorised by the generator
   that retrieval quality stops mattering — this would silently destroy the whole A/B
   premise; documents too short for chunking strategy to have any effect.
+- **Known environment constraint.** In the Claude Code web session, `huggingface.co`,
+  `zenodo.org` and `arxiv.org` are refused by the egress policy (gateway 403 on CONNECT);
+  `pypi.org` and `raw.githubusercontent.com` are reachable. CUAD is distributed through
+  the first three. The ingestion step must therefore either run on Aksh's machine, or
+  fetch from a source this session can reach — decided at the start of Phase 2, not
+  worked around.
 - **Done when.** `ingest` runs from a clean checkout, produces a dataset with a stable
   hash, and the licence is stated in `DECISIONS.md` and the README.
 
