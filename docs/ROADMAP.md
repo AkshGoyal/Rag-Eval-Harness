@@ -1,9 +1,10 @@
 # Roadmap
 
 **Current phase:** Phase 0 — Discovery (in progress)
-**Last updated:** 2026-09-18
-**Next action:** Aksh answers question batch 1 (repo/stack, corpus, providers and
-budget, pipeline vs adapter). Nothing is built until those are settled.
+**Last updated:** 2026-09-19
+**Next action:** Aksh answers question batch 1 — corpus choice, provider access and
+budget, own-pipeline-versus-adapter scope, and hand-labelling hours. Nothing is built
+until those are settled.
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.
@@ -15,7 +16,7 @@ under §1.6 of `CLAUDE.md`.
 | Phase | Name | Status |
 |-------|------|--------|
 | 0 | Discovery and working agreement | **in progress** |
-| 1 | Repo home and stack selection | not started |
+| 1 | Repo home and stack selection | in progress — repo home settled (D-001), stack not started |
 | 2 | Corpus selection and ingestion | not started |
 | 3 | Seed test set (v0) | not started |
 | 4 | Reference RAG pipeline | not started |
