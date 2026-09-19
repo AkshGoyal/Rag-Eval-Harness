@@ -12,6 +12,8 @@ isn't in this file, that's a bug in our process.
 |----|----------|-------|------|--------|
 | D-001 | Dedicated private repo, not the profile repo | 1 | 2026-09-19 | active — revisit at Phase 12 |
 | D-002 | Commits authored as Aksh, Claude as co-author | 1 | 2026-09-19 | active |
+| D-003 | Corpus is CUAD (510 annotated contracts, CC BY 4.0) | 2 | 2026-09-19 | active |
+| D-004 | Generic harness first, adapter for Aksh's chatbot second | 0 | 2026-09-19 | active |
 
 Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
@@ -74,6 +76,82 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
   so catching it before the first commit of a session matters.
 - **When to revisit:** if the repo gains other contributors, or if authorship needs to be
   enforced by a hook rather than remembered.
+- **Date:** 2026-09-19
+
+---
+
+## D-003 — The corpus is CUAD
+
+- **Decision:** the reference corpus is the Contract Understanding Atticus Dataset —
+  510 commercial contracts filed publicly with the SEC, annotated by legal experts with
+  13,000+ labelled spans across 41 clause categories. Licence CC BY 4.0.
+- **Context:** the harness needs a document set to be developed against. Two constraints
+  dominated: (1) if the generator can answer from pretrained memory, retrieval quality
+  stops affecting scores and the whole A/B premise collapses; (2) Aksh has 30–60 minutes
+  total for manual labelling, so any corpus requiring hand-marked answer locations is out.
+- **Alternatives considered:**
+  - *SEC EDGAR filings (public domain)* — rejected for now: the best numeric corpus, but
+    no annotations, so every answer location would be hand-marked, and HTML/XBRL parsing
+    would consume the early phases. Retained as the natural expansion: CUAD's contracts
+    came from EDGAR, so growing into it later is not a rewrite.
+  - *PubMed Central Open Access* — rejected: licences are per-article and mixed
+    (CC BY-ND sits in the same bundle), so the set needs filtering, and verifying
+    biomedical reference answers is the heaviest reading load of the candidates.
+  - *MultiHop-RAG (ODC-BY)* — rejected on two counts: its news corpus runs to Dec 2023
+    and sits inside model training data, and it supplies the ready-made test set, which
+    is the part of this project with the most to teach and the most to show.
+  - *Wikipedia / HotpotQA* — rejected: the most memorised corpus in existence. Gold
+    supporting-sentence labels do not compensate for a generator that already knows the
+    answers.
+- **Why this one:** the expert annotations *are* the retrieval labels, which converts a
+  task Aksh has no time for into one already done. Beyond that: very low leakage, an
+  unambiguous CC BY 4.0 licence, and documents long enough that chunking strategy has
+  something to bite on.
+- **Risks / failure modes:** (1) contract English is dense — if every config scores near
+  zero, differences between configs vanish into a floor effect and the harness shows
+  nothing; (2) the annotations are *spans*, not question-answer pairs, so converting them
+  into natural questions is a design step with its own failure modes, chiefly questions
+  that leak their own answers; (3) CUAD's 41 clause categories do not map onto the
+  evaluation categories we care about (single-fact, multi-hop, numeric, refusal), so the
+  taxonomy has to be built, not inherited.
+- **How we'd detect it:** the seed test set at Phase 3 is the tripwire. If every config
+  scores near 0% or near 100%, question difficulty is wrong and the corpus or the
+  generation step needs revisiting — visible at Milestone A, before any expensive work.
+- **When to revisit:** if the seed set shows a floor or ceiling effect; or if the adapter
+  work makes a domain closer to Aksh's own system more useful.
+- **Date:** 2026-09-19
+
+---
+
+## D-004 — Build the generic harness first, adapt to Aksh's chatbot second
+
+- **Decision:** the harness is built and proven against its own reference RAG pipeline
+  over CUAD. The boundary between harness and RAG system is defined up front — questions
+  in, answers plus retrieved sources out — so that Aksh's own chatbot can be attached
+  later through an adapter without reworking the harness.
+- **Context:** three goals arrived together: evaluate Aksh's existing chatbot, understand
+  how RAG evaluation works in general, and produce a portfolio piece. They pull in
+  different directions only if the harness is coupled to whatever it measures.
+  On confidentiality: Aksh has confirmed the chatbot material is not confidential and
+  that §0 is not engaged by it. §0 remains in force as written for everything else, and
+  nothing from that system is needed for the phases now planned.
+- **Alternatives considered:**
+  - *Adapter first, against the existing chatbot* — rejected: there would be nothing
+    public to develop the harness against, no reproducible example a reader could run,
+    and debugging the harness and the adapter simultaneously makes every failure
+    ambiguous.
+  - *Only ever evaluate the existing chatbot* — rejected: it would not be runnable by
+    anyone else, which removes both the portfolio value and the general lesson.
+- **Why this one:** one build serves all three goals. The reference pipeline doubles as a
+  fixture that makes the harness testable without any external system, and the boundary
+  discipline is what makes the adapter cheap when it comes.
+- **Risks / failure modes:** the boundary gets shaped around CUAD's peculiarities and
+  then does not fit a real chatbot's output; or the adapter is deferred indefinitely and
+  the "evaluate my own system" goal quietly never happens.
+- **How we'd detect it:** write the adapter interface *before* the CUAD pipeline
+  implements it, and check it against what Aksh's chatbot can actually emit. If the
+  interface needs CUAD-specific fields, the boundary is wrong.
+- **When to revisit:** after Milestone A, when the interface has met real data.
 - **Date:** 2026-09-19
 
 ---

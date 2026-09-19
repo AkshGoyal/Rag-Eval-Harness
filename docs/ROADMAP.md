@@ -1,10 +1,10 @@
 # Roadmap
 
-**Current phase:** Phase 0 — Discovery (in progress)
+**Current phase:** Phase 1 — Stack and model tier selection (in progress)
 **Last updated:** 2026-09-19
-**Next action:** Aksh answers question batch 1 — corpus choice, provider access and
-budget, own-pipeline-versus-adapter scope, and hand-labelling hours. Nothing is built
-until those are settled.
+**Next action:** decide the model tier for the reference pipeline's generator and judge
+under the fixed ₹1000 total budget (D-005, pending). Corpus, scope, labelling budget
+and provider are settled — see D-003, D-004 and the constraints below.
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.
@@ -15,9 +15,9 @@ under §1.6 of `CLAUDE.md`.
 
 | Phase | Name | Status |
 |-------|------|--------|
-| 0 | Discovery and working agreement | **in progress** |
-| 1 | Repo home and stack selection | in progress — repo home settled (D-001), stack not started |
-| 2 | Corpus selection and ingestion | not started |
+| 0 | Discovery and working agreement | **complete** (2026-09-19) |
+| 1 | Repo home and stack selection | **in progress** — repo home settled (D-001); stack and model tier open |
+| 2 | Corpus selection and ingestion | corpus chosen (D-003), ingestion not started |
 | 3 | Seed test set (v0) | not started |
 | 4 | Reference RAG pipeline | not started |
 | 5 | Run harness core | not started |
@@ -29,6 +29,7 @@ under §1.6 of `CLAUDE.md`.
 | 11 | A/B comparison and noise handling | not started |
 | 12 | Worked example | not started |
 | 13 | Docs, README, polish — **Milestone C** | not started |
+| 14 | Adapter for an external RAG system | not started |
 
 **Milestone A — walking skeleton.** One config runs end to end over a real corpus and
 produces retrieval scores with a manifest. No LLM judge involved. First real signal.
@@ -38,6 +39,34 @@ generation, with the judge calibrated against human labels and the agreement num
 written down.
 
 **Milestone C — portfolio ready.** Definition of done in the brief is met.
+
+---
+
+## Fixed constraints
+
+These are settled and bound every phase below. Changing one is a decision, not an
+adjustment.
+
+| Constraint | Value | Consequence |
+|---|---|---|
+| Total budget | **₹1000 (~$11–12), all costs** | Model tier is a budget decision, not a quality one. A hard in-code spend cap is required before the first uncached LLM call. |
+| Aksh's manual labelling time | **30–60 minutes, total** | Test cases are derived from CUAD annotations and spot-checked, never hand-authored. Judge calibration gets one overall agreement number, not per-category. |
+| Corpus | CUAD, CC BY 4.0 (D-003) | Retrieval labels come free from expert annotations. |
+| Provider | OpenAI (Aksh's existing access) | Single provider behind the wrapper; swapping is a config change, not a rewrite. |
+| Scope order | Generic harness, then adapter (D-004) | The harness never depends on any particular RAG system. |
+
+### What the budget rules out
+
+At GPT-4o rates a judged case costs roughly $0.03 all-in. ₹1000 buys about 380 of
+them — a single two-config comparison over 100 cases, with nothing left for the
+iteration, mistakes and repeated runs that the work actually requires. The generator
+and judge therefore run on a cheap tier by default, and any escalation is paid for out
+of a reserved slice and justified by calibration evidence rather than assumed.
+
+The larger financial risk is not per-token price but accidental spend: a retry loop, or
+re-indexing the full corpus repeatedly. That is what the Phase 5 budget cap and the
+response cache exist to prevent, which raises their priority — **no uncached LLM call
+should ever be made in this project.**
 
 ---
 
@@ -108,6 +137,9 @@ written down.
 
 - **Goal.** The part that makes results trustworthy: manifest, cache, structured logs,
   budget cap, per-case error isolation.
+- **Brought forward by the budget.** The cache and the spend cap must exist before the
+  first uncached LLM call, not after Phase 4 is finished. With ₹1000 total, an
+  unprotected retry loop is not an inconvenience, it is the end of the project.
 - **Main decisions.** Manifest contents and format; cache key composition and storage;
   log schema; budget-cap behaviour on trip; how a per-case error is represented.
 - **Key risks.** A cache key missing a field (stale results attributed to a new config —
@@ -250,3 +282,16 @@ written down.
 
 Tracked in full in the session notes; batch 1 is: repo home and stack constraints,
 corpus choice, provider access and budget, and own-pipeline-versus-adapter scope.
+
+### Phase 14 — Adapter for an external RAG system
+
+- **Goal.** Point the harness at Aksh's own chatbot, through the boundary defined in
+  D-004, without changing the harness.
+- **Main decisions.** The adapter interface (already fixed in principle: questions in,
+  answers plus retrieved sources out); how a system that cannot report its retrieved
+  sources is handled; whether the adapter and any results are committed or kept local.
+- **Key risks.** The interface turns out to be CUAD-shaped and does not fit real output;
+  the external system cannot expose retrieved sources at all, which would make retrieval
+  and generation impossible to score separately — the harness's main claim.
+- **Done when.** One real evaluation run against an external system produces a report in
+  the same format as a CUAD run.
