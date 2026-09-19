@@ -14,7 +14,7 @@ isn't in this file, that's a bug in our process.
 | D-002 | Commits authored as Aksh, Claude as co-author | 1 | 2026-09-19 | active |
 | D-003 | Corpus is CUAD (510 annotated contracts, CC BY 4.0) | 2 | 2026-09-19 | active |
 | D-004 | Generic harness first, adapter for Aksh's chatbot second | 0 | 2026-09-19 | active |
-| D-005 | Asymmetric cross-provider models: Gemini generator, OpenAI judge | 1 | 2026-09-19 | active |
+| D-005 | Asymmetric cross-provider models: Gemini generator, OpenAI judge | 1 | 2026-09-19 | **provisional default** — revisit at Phase 4 / Phase 8 |
 
 Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
@@ -158,6 +158,38 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 ---
 
 ## D-005 — Generator and judge come from different providers
+
+> **Status: provisional default, deliberately reversible.** Aksh asked whether this needs
+> deciding now. It does not. Model choice is a configuration value, not an architectural
+> commitment, and the point of the provider wrapper is that swapping it touches one file
+> plus a config line. What follows is the starting default and the reasoning behind it;
+> the generator is reconsidered at Phase 4 when the pipeline is real, and the judge at
+> Phase 8 before any calibration effort is spent.
+>
+> **Reversibility is not free — it is a Phase 1 requirement.** Three things must exist,
+> or a later model swap corrupts results instead of changing them:
+> 1. **Every LLM and embedding call goes through one wrapper module.** Without it, model
+>    IDs scatter through the codebase and a swap becomes a refactor.
+> 2. **The cache key includes the model ID, the prompt version and the input.** Swapping
+>    a model must *miss* the cache. A cache keyed only on input would silently serve
+>    answers from the old model under the new model's name — the most dangerous bug this
+>    codebase can have, because nothing would look wrong.
+> 3. **The run manifest records the exact model IDs.** Any number in any report must be
+>    traceable to the models that produced it, or comparisons across a swap are
+>    meaningless.
+>
+> **The switching costs are not equal, and this changes the schedule:**
+>
+> | Component | Cost to change | Consequence |
+> |---|---|---|
+> | Generator | ~₹35 to re-run | Cheap. Old results are invalid and must be re-run, not mixed. |
+> | Embeddings | ~₹12 to re-index | Cheap in money — but every stored vector is invalidated, so the index must be keyed by embedding model or retrieval silently degrades. |
+> | **Judge** | **30–60 minutes of Aksh's time** | Calibration labels validate one specific judge-plus-rubric pair. Change either and the agreement number no longer applies. |
+>
+> The judge is therefore the only genuinely sticky choice, and its cost is the scarcest
+> resource in the project. The scheduling consequence: **do not spend the calibration
+> budget until the judge and its rubric are settled.** Phase 9 must not start early.
+
 
 - **Decision:** the reference pipeline uses **different model families for generation and
   judging**, both from the cheap tier:
