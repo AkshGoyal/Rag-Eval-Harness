@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# No `env:` block and no `secrets` anywhere in this file, deliberately. The suite
+# must pass without credentials; if a module starts reading an API key at import
+# time, this workflow is what catches it.
+#
+# A single Python version by design: Actions minutes are metered on private
+# repositories (see D-001), and a matrix would multiply that for little return
+# while the project is small.
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies from the lockfile
+        run: uv sync --locked --dev
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Typecheck
+        run: uv run mypy
+
+      - name: Test
+        run: uv run pytest

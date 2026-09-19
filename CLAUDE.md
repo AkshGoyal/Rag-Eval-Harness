@@ -122,6 +122,26 @@ The docs cover design. The code must make failures just as easy to locate at run
 - At the end of every session, make sure `docs/ROADMAP.md` reflects exactly where we
   stopped.
 
+### 1.5a How to talk to me
+
+Added 2026-09-19, after the Phase 1 build, because the explanations had drifted into
+jargon and the project started slipping away from me. This matters as much as the code:
+the goal in 1.3 is that I hold the whole system in my head, and I cannot do that from
+terminology I have to decode.
+
+- **Write in flowing prose, not walls of tables and bullets.** A table is for comparing
+  things. An explanation is not a comparison.
+- **Define a term the first time it appears**, in one short clause, and then use it.
+  Assume no familiarity with library names, tooling conventions, or eval vocabulary.
+- **Explain the trade-off, not just the winner.** What we gave up, and why that was
+  acceptable, is the part I need in order to disagree with you later.
+- **Ask rather than assume**, and ask in plain words. If a question needs a paragraph of
+  setup before it makes sense, write the paragraph.
+- **Keep it in a flow.** One thing leading to the next, rather than scattered fragments
+  I have to reassemble.
+- If I say I don't understand something, that is a problem with the explanation, not
+  with me. Re-explain it differently rather than adding more detail to the same framing.
+
 ### 1.6 This brief is a starting hypothesis
 
 Everything in the original brief's sections 2–4 (what the tool does, things that matter,

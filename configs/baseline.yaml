@@ -1,0 +1,36 @@
+# The baseline configuration: the "A" side of every comparison.
+#
+# Values marked placeholder are settled in later phases. They are written out
+# rather than omitted so the shape of a configuration is visible from day one.
+name: baseline
+
+corpus:
+  name: cuad
+  version: v1
+  hash: null                      # filled by ingestion (Phase 2)
+
+chunking:
+  strategy: fixed_token
+  size: 512                       # benchmark-validated default; revisited in Phase 4
+  overlap: 64
+
+embedding:
+  provider: openai
+  model: text-embedding-3-small   # D-005
+
+retrieval:
+  method: dense
+  top_k: 5
+
+generation:
+  provider: google
+  model: placeholder-flash-lite   # placeholder: exact ID verified in Phase 4 (D-005)
+  prompt: prompts/generate/v1.md  # placeholder: written in Phase 4
+  temperature: 0.0                # deterministic where the provider allows it
+  max_output_tokens: 512
+
+judge:
+  provider: openai
+  model: gpt-4o-mini              # D-005
+  rubric: prompts/judge/v1.md     # placeholder: written in Phase 8
+  max_output_tokens: 512

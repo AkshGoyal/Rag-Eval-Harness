@@ -1,0 +1,26 @@
+judge:
+  max_output_tokens: 512
+  rubric: prompts/judge/v1.md
+  model: gpt-4o-mini
+  provider: openai
+retrieval:
+  top_k: 5
+  method: dense
+generation:
+  max_output_tokens: 512
+  temperature: 0.0
+  prompt: prompts/generate/v1.md
+  model: placeholder-flash-lite
+  provider: google
+embedding:
+  model: text-embedding-3-small
+  provider: openai
+chunking:
+  overlap: 64
+  size: 512
+  strategy: fixed_token
+corpus:
+  hash: null
+  version: v1
+  name: cuad
+name: fixture-valid

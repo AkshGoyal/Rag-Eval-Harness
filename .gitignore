@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Secrets - never committed (see .env.example for the names)
+.env
+.env.*
+!.env.example
+
+# Project data. Corpora are fetched by script and verified by hash, never
+# committed. Run outputs and cached API responses stay local: a cache holds
+# raw provider responses that have not been reviewed.
+data/
+runs/
+.cache/

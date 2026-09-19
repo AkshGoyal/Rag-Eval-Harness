@@ -1,0 +1,26 @@
+name: fixture-valid
+corpus:
+  name: cuad
+  version: v1
+  hash: null
+chunking:
+  strategy: fixed_token
+  size: 512
+  overlap: 64
+embedding:
+  provider: openai
+  model: text-embedding-3-small
+retrieval:
+  method: dense
+  top_K: 5
+generation:
+  provider: google
+  model: placeholder-flash-lite
+  prompt: prompts/generate/v1.md
+  temperature: 0.0
+  max_output_tokens: 512
+judge:
+  provider: openai
+  model: gpt-4o-mini
+  rubric: prompts/judge/v1.md
+  max_output_tokens: 512

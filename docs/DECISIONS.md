@@ -15,6 +15,7 @@ isn't in this file, that's a bug in our process.
 | D-003 | Corpus is CUAD (510 annotated contracts, CC BY 4.0) | 2 | 2026-09-19 | active |
 | D-004 | Generic harness first, adapter for Aksh's chatbot second | 0 | 2026-09-19 | active |
 | D-005 | Asymmetric cross-provider models: Gemini generator, OpenAI judge | 1 | 2026-09-19 | **provisional default** — revisit at Phase 4 / Phase 8 |
+| D-006 | Stack: Python + uv, YAML + Pydantic, exact NumPy retrieval, pytest | 1 | 2026-09-19 | active |
 
 Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
@@ -254,6 +255,58 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
   calibration (Phase 9) shows GPT-4o-mini disagreeing with Aksh's labels too often, in
   which case a stronger judge is paid for out of the reserve rather than assumed; or if
   the seed set shows a floor effect.
+
+- **Date:** 2026-09-19
+
+---
+
+## D-006 — The stack
+
+- **Decision:** Python (3.11 or newer) with **uv** managing dependencies; configuration
+  written in **YAML** and validated by **Pydantic**; retrieval by **exact search over a
+  NumPy array**, with no vector database; **pytest** for tests, **ruff** for linting and
+  formatting, **mypy** in strict mode for type checking, and **GitHub Actions** running
+  all four with no credentials available to it.
+
+- **Context:** the foundation every later phase inherits. The constraint that shaped it
+  is not cost or speed but *attribution*: this harness exists to say "answers changed
+  because this setting changed", so anything that introduces variation of its own
+  undermines the only claim the tool makes.
+
+- **Alternatives considered:**
+  - *A vector database (Chroma, FAISS, sqlite-vec)* — rejected, and this was the one real
+    decision here. The usual choices default to **approximate** nearest-neighbour search,
+    which trades exactness for speed and can return slightly different neighbours between
+    index builds. If configuration A and configuration B differ only in chunk size, but
+    the index is *also* varying underneath, the score difference cannot be attributed to
+    the change. At the size this corpus reaches — roughly 12,900 chunks, about 79 MB of
+    vectors — exact search is a single matrix multiplication taking well under a
+    millisecond, so exactness costs nothing we would notice.
+  - *pip with requirements.txt* — rejected: pinning is manual, and reproducibility is the
+    product here rather than a nicety.
+  - *TOML or Python files for configuration* — TOML handles the nesting a retrieval
+    config needs poorly; a Python config file can execute arbitrary code and cannot be
+    hashed honestly, which breaks the manifest.
+
+- **Why this one:** exact retrieval protects the harness's central claim; a lockfile
+  makes runs reproducible; validated configuration turns a class of silent mistakes into
+  loud ones at load time; and a test suite that needs no API keys can run on every push
+  for free.
+
+- **Risks / failure modes:** (1) exact search stops being practical somewhere past
+  roughly 100,000 chunks, well beyond this corpus but not beyond a future one;
+  (2) a reader skimming the repository may read "no vector database" as naivety rather
+  than as a deliberate choice; (3) strict type checking and linting can become friction
+  that tempts blanket suppressions, which would quietly remove the benefit.
+
+- **How we'd detect it:** (1) shows up as retrieval latency growing noticeably during a
+  run, and the retriever sits behind an interface so a swap is contained; (2) is
+  addressed by the README explaining the reasoning rather than only the choice; (3) is
+  visible as `# type: ignore` or `# noqa` comments accumulating — the codebase currently
+  has exactly one, on a test value that is invalid on purpose.
+
+- **When to revisit:** if the corpus grows by an order of magnitude, or if the Phase 14
+  adapter points the harness at a system whose index we do not control.
 
 - **Date:** 2026-09-19
 

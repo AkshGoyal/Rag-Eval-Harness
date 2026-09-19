@@ -1,9 +1,10 @@
 # Roadmap
 
-**Current phase:** Phase 1 — Stack and model tier selection (in progress)
+**Current phase:** Phase 2 — Corpus selection and ingestion (not started)
 **Last updated:** 2026-09-19
-**Next action:** Phase 1 stack selection — language, config format, vector store, test
-runner. Corpus, scope, labelling budget, models and budget are settled (D-003 to D-005).
+**Next action:** Phase 2 — get CUAD onto disk, versioned and hashed. The first thing to
+settle is where it is fetched from, because this session's network policy blocks the
+usual sources (see Phase 2 below).
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.
@@ -15,7 +16,7 @@ under §1.6 of `CLAUDE.md`.
 | Phase | Name | Status |
 |-------|------|--------|
 | 0 | Discovery and working agreement | **complete** (2026-09-19) |
-| 1 | Repo home and stack selection | **in progress** — repo home settled (D-001); stack and model tier open |
+| 1 | Repo home and stack selection | **complete** (2026-09-19) — D-001, D-005, D-006 |
 | 2 | Corpus selection and ingestion | corpus chosen (D-003), ingestion not started |
 | 3 | Seed test set (v0) | not started |
 | 4 | Reference RAG pipeline | not started |
