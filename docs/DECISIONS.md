@@ -17,6 +17,7 @@ isn't in this file, that's a bug in our process.
 | D-005 | Asymmetric cross-provider models: Gemini generator, OpenAI judge | 1 | 2026-09-19 | **provisional default** — revisit at Phase 4 / Phase 8 |
 | D-006 | Stack: Python + uv, YAML + Pydantic, exact NumPy retrieval, pytest | 1 | 2026-09-19 | active |
 | D-007 | Dataset normalised on ingest, fetched over plain HTTPS, fingerprinted | 2 | 2026-09-20 | active |
+| D-008 | Questions from hand-written templates; retrieval searches all 510 contracts | 3 | 2026-09-20 | active |
 
 Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
@@ -370,6 +371,67 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
 - **When to revisit:** if the upstream archive moves, or if a second corpus is added and
   the normalised shape turns out to be CUAD-flavoured after all.
+
+- **Date:** 2026-09-20
+
+---
+
+## D-008 — Questions come from hand-written templates, and retrieval searches everything
+
+- **Decision:** two linked choices. Each test question names the contract it asks about
+  and retrieval searches all 510 contracts at once, rather than being handed the right
+  contract. And questions are produced by filling hand-written templates — two phrasings
+  per clause category, 82 in total, frozen in `testset/templates.yaml` — rather than
+  being generated at run time.
+
+- **Context:** CUAD's questions are annotation instructions ("Highlight the parts (if
+  any) of this contract related to 'Governing Law' that should be reviewed by a
+  lawyer"), which measure instruction-following rather than retrieval. Something had to
+  turn them into questions a person would ask.
+
+- **Alternatives considered:**
+  - *Hand the system one contract and ask it to find a clause inside it* — rejected:
+    searching a single document is not a retrieval problem. Nearly every configuration
+    succeeds, so an A/B comparison shows no difference where real ones exist.
+  - *Have a model write each question from the clause text* — rejected. The model would
+    be looking at the answer while writing the question and tends to reuse its
+    distinctive words, and a question containing its own answer makes retrieval look
+    good while testing nothing. Verifying twenty thousand generated questions is not
+    affordable, and generation would make the test set non-deterministic.
+  - *Generate paraphrases through an API at build time* — rejected as unnecessary
+    machinery. The phrasings are written once and frozen as data, so the test set has no
+    runtime model dependency at all.
+
+- **Why this one:** nothing that wrote a phrasing ever saw a contract or an answer, so a
+  phrasing cannot leak an answer it was never shown. That is the same move as D-005:
+  prefer making a problem impossible over making it detectable. The cost is honest and
+  worth stating — phrasings are template-shaped, so the test set says nothing about
+  robustness to how differently real users word things.
+
+- **The trade in searching everything:** naming the contract makes finding the right
+  *document* easier, because the name echoes text inside it. What stays hard is finding
+  the right *passage* within it, competing against every other passage of the same
+  contract. Retrieval is therefore tested on clause discrimination rather than document
+  identification, which is the more useful of the two to measure.
+
+- **Risks / failure modes:** (1) the contract's name can itself give away an answer —
+  asking who the parties are to "the Galera Therapeutics joint filing agreement" hands
+  over a party; (2) template phrasing could be inadvertently tuned to favour one
+  retrieval configuration; (3) a contract name that identifies two contracts makes a
+  case unanswerable as posed.
+
+- **How we'd detect it:** (1) is measured, not assumed. Every case carries the share of
+  its answer's distinctive words that already appear in the question, and cases at or
+  above 0.5 are excluded and counted in the manifest. On the real corpus this rejects
+  429 of 510 "Document Name" cases — where the question names the contract and the
+  answer *is* the contract's name — and, less obviously, 73 "Governing Law" cases, where
+  a company name contains a state or country. That second group is the check earning its
+  place: it was not something anyone predicted. (3) fails loudly at build time; names are
+  disambiguated by filing year and then by ordinal, and 510 of 510 are distinct.
+
+- **Still to do:** the stronger leakage test is empirical — ask the generator each
+  question with no documents at all, and discard any case it answers correctly, because
+  that case measures nothing. It needs the generator, so it belongs to a later phase.
 
 - **Date:** 2026-09-20
 

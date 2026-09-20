@@ -1,10 +1,10 @@
 # Roadmap
 
-**Current phase:** Phase 3 — Seed test set (not started)
+**Current phase:** Phase 4 — Reference RAG pipeline (not started)
 **Last updated:** 2026-09-19
-**Next action:** Phase 3 — turn CUAD's annotation instructions into natural questions
-and build a small, verified seed test set. This is the hardest part of the project and
-the part with the most judgment in it.
+**Next action:** Aksh reviews `testset/templates.yaml` — 82 phrasings, about fifteen
+minutes, and the highest-leverage review in the project because a bad phrasing quietly
+weakens every case in its category. Then Phase 4 builds the reference pipeline.
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.
@@ -18,7 +18,7 @@ under §1.6 of `CLAUDE.md`.
 | 0 | Discovery and working agreement | **complete** (2026-09-19) |
 | 1 | Repo home and stack selection | **complete** (2026-09-19) — D-001, D-005, D-006 |
 | 2 | Corpus selection and ingestion | **complete** (2026-09-20) — D-003, D-007 |
-| 3 | Seed test set (v0) | not started |
+| 3 | Seed test set (v0) | **complete** (2026-09-20) — D-008; templates awaiting review |
 | 4 | Reference RAG pipeline | not started |
 | 5 | Run harness core | not started |
 | 6 | Retrieval metrics — **Milestone A** | not started |

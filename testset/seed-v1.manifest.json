@@ -1,0 +1,22 @@
+{
+  "name": "seed-v1",
+  "dataset_name": "cuad",
+  "dataset_version": "v1",
+  "dataset_content_hash": "5ec6b7bfb01349e0a85a3b06b5ce17a8e5d709a68f645df52bc8f137adbafefe",
+  "templates_hash": "43e7fa5b74c533bce2d2bd66dc218b12e979fd0da98f96d11a239bfc04b221ea",
+  "seed": "rag-eval-harness/seed-v1",
+  "case_count": 30,
+  "counts_by_type": {
+    "existence_no": 8,
+    "existence_yes": 6,
+    "extraction_multi": 6,
+    "extraction_single": 7,
+    "not_stated": 3
+  },
+  "excluded_for_leakage": 9,
+  "max_answer_overlap": 0.1818,
+  "overlap_threshold": 0.5,
+  "content_hash": "28a811b4851e178577ef54c51084988d2e829d4dd64824670ab866bdba027b27",
+  "built_by": "0.1.0",
+  "created_at": "2026-09-20T08:30:19+00:00"
+}

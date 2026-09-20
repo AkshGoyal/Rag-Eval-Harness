@@ -1,0 +1,216 @@
+# Question phrasings, one entry per CUAD clause category.
+#
+# These are written by hand and frozen here as data. Nothing generates a question
+# at run time, so the test set is fully deterministic, and nothing that wrote these
+# ever saw a contract or an answer - a phrasing cannot leak an answer it was never
+# shown. {contract} is replaced with a readable contract name.
+#
+# style: "extraction" asks for a value out of the contract;
+#        "existence" asks whether a kind of clause is present at all.
+version: 1
+templates:
+- category: Affiliate License-Licensee
+  style: existence
+  phrasings:
+  - Does {contract} extend a licence to the licensee's affiliates?
+  - Are the licensee's affiliates granted rights under {contract}?
+- category: Affiliate License-Licensor
+  style: existence
+  phrasings:
+  - Does {contract} include a licence granted by the licensor's affiliates?
+  - Do affiliates of the licensor grant any rights under {contract}?
+- category: Agreement Date
+  style: extraction
+  phrasings:
+  - On what date was {contract} entered into?
+  - What is the date of {contract}?
+- category: Anti-Assignment
+  style: existence
+  phrasings:
+  - Does {contract} restrict either party from assigning it?
+  - Is consent or notice needed to transfer {contract} to a third party?
+- category: Audit Rights
+  style: existence
+  phrasings:
+  - Does {contract} give either party the right to audit the other?
+  - Can a party inspect the other's books or records under {contract}?
+- category: Cap on Liability
+  style: existence
+  phrasings:
+  - Does {contract} cap either party's liability?
+  - Is there a ceiling on damages under {contract}?
+- category: Change of Control
+  style: existence
+  phrasings:
+  - Does a change of control trigger any right under {contract}?
+  - Does {contract} address what happens if a party is acquired?
+- category: Competitive Restriction Exception
+  style: existence
+  phrasings:
+  - Does {contract} carve out exceptions to its competitive restrictions?
+  - Are there stated exceptions to the non-compete terms of {contract}?
+- category: Covenant Not to Sue
+  style: existence
+  phrasings:
+  - Does {contract} stop a party from challenging the other's intellectual property?
+  - Is there a covenant not to sue in {contract}?
+- category: Document Name
+  style: extraction
+  phrasings:
+  - What is {contract} formally titled?
+  - What name is given to {contract} in its own text?
+- category: Effective Date
+  style: extraction
+  phrasings:
+  - From what date does {contract} take effect?
+  - When does {contract} become effective?
+- category: Exclusivity
+  style: existence
+  phrasings:
+  - Does {contract} create an exclusive arrangement between the parties?
+  - Is either party bound to deal exclusively under {contract}?
+- category: Expiration Date
+  style: extraction
+  phrasings:
+  - When does the initial term of {contract} end?
+  - On what date does {contract} expire?
+- category: Governing Law
+  style: extraction
+  phrasings:
+  - Which state's or country's law governs {contract}?
+  - Under which jurisdiction is {contract} interpreted?
+- category: IP Ownership Assignment
+  style: existence
+  phrasings:
+  - Does {contract} assign ownership of created intellectual property?
+  - Is intellectual property developed under {contract} transferred to a party?
+- category: Insurance
+  style: existence
+  phrasings:
+  - Does {contract} require either party to carry insurance?
+  - Are there insurance obligations in {contract}?
+- category: Irrevocable or Perpetual License
+  style: existence
+  phrasings:
+  - Does {contract} grant a licence that is irrevocable or perpetual?
+  - Is any licence under {contract} granted without an end date?
+- category: Joint IP Ownership
+  style: existence
+  phrasings:
+  - Does {contract} provide for joint ownership of intellectual property?
+  - Is any intellectual property shared between the parties under {contract}?
+- category: License Grant
+  style: existence
+  phrasings:
+  - Does {contract} grant a licence from one party to the other?
+  - Are any licence rights conferred by {contract}?
+- category: Liquidated Damages
+  style: existence
+  phrasings:
+  - Does {contract} specify liquidated damages for breach?
+  - Is a fixed sum payable on breach under {contract}?
+- category: Minimum Commitment
+  style: existence
+  phrasings:
+  - Does {contract} impose a minimum purchase or order commitment?
+  - Is either party required to buy a minimum amount under {contract}?
+- category: Most Favored Nation
+  style: existence
+  phrasings:
+  - Does {contract} promise terms at least as good as those given to others?
+  - Is there a most-favoured-nation clause in {contract}?
+- category: No-Solicit of Customers
+  style: existence
+  phrasings:
+  - Does {contract} restrict either party from soliciting the other's customers?
+  - Are customer solicitation restrictions imposed by {contract}?
+- category: No-Solicit of Employees
+  style: existence
+  phrasings:
+  - Does {contract} restrict hiring or soliciting the other party's employees?
+  - Is there a restriction on poaching staff in {contract}?
+- category: Non-Compete
+  style: existence
+  phrasings:
+  - Does {contract} restrict either party from competing?
+  - Is there a non-compete obligation in {contract}?
+- category: Non-Disparagement
+  style: existence
+  phrasings:
+  - Does {contract} prohibit the parties from disparaging each other?
+  - Is there a non-disparagement obligation in {contract}?
+- category: Non-Transferable License
+  style: existence
+  phrasings:
+  - Does {contract} make any licence non-transferable?
+  - Is a party barred from transferring licensed rights under {contract}?
+- category: Notice Period to Terminate Renewal
+  style: extraction
+  phrasings:
+  - How much notice is required to stop {contract} renewing?
+  - What notice period applies to terminating renewal of {contract}?
+- category: Parties
+  style: extraction
+  phrasings:
+  - Who are the parties to {contract}?
+  - Which entities signed {contract}?
+- category: Post-Termination Services
+  style: existence
+  phrasings:
+  - Does {contract} impose obligations that survive its termination?
+  - Must either party continue providing anything after {contract} ends?
+- category: Price Restrictions
+  style: existence
+  phrasings:
+  - Does {contract} limit a party's ability to change prices?
+  - Are there restrictions on pricing in {contract}?
+- category: Renewal Term
+  style: extraction
+  phrasings:
+  - For how long does {contract} renew after its initial term?
+  - What is the renewal term of {contract}?
+- category: Revenue/Profit Sharing
+  style: existence
+  phrasings:
+  - Does {contract} require one party to share revenue or profit?
+  - Is revenue split between the parties under {contract}?
+- category: Rofr/Rofo/Rofn
+  style: existence
+  phrasings:
+  - Does {contract} grant a right of first refusal, offer or negotiation?
+  - Does either party get first call on an opportunity under {contract}?
+- category: Source Code Escrow
+  style: existence
+  phrasings:
+  - Does {contract} require source code to be placed in escrow?
+  - Is there a source code escrow arrangement in {contract}?
+- category: Termination for Convenience
+  style: existence
+  phrasings:
+  - Can a party end {contract} without cause?
+  - Does {contract} allow termination for convenience?
+- category: Third Party Beneficiary
+  style: existence
+  phrasings:
+  - Does {contract} give rights to anyone who did not sign it?
+  - Is there a third party beneficiary named in {contract}?
+- category: Uncapped Liability
+  style: existence
+  phrasings:
+  - Does {contract} leave either party's liability uncapped?
+  - Is liability unlimited in any circumstance under {contract}?
+- category: Unlimited/All-You-Can-Eat-License
+  style: existence
+  phrasings:
+  - Does {contract} grant an unlimited or enterprise-wide licence?
+  - Is any licence in {contract} unrestricted in scope or volume?
+- category: Volume Restriction
+  style: existence
+  phrasings:
+  - Does {contract} impose a cap on quantities or usage?
+  - Are there volume limits in {contract}?
+- category: Warranty Duration
+  style: extraction
+  phrasings:
+  - How long does the warranty in {contract} last?
+  - What is the duration of any warranty given under {contract}?

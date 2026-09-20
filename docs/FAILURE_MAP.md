@@ -6,7 +6,7 @@ like from the outside, where to look first, and how to recover.
 This document is written from the symptom inwards, because that is the direction you
 read it in when something is broken.
 
-**Status:** covers the configuration and dataset layers. Entries are added
+**Status:** covers the configuration, dataset and test-set layers. Entries are added
 in the same step that builds the component they describe — a component is not "done"
 until its failure modes are listed here.
 
@@ -23,6 +23,9 @@ until its failure modes are listed here.
 | Scores moved and you did not change the configuration | [Dataset — documents changed underneath you](#dataset--documents-changed-underneath-you) |
 | `ingest` stops saying the fingerprint does not match | [Dataset — the upstream archive changed](#dataset--the-upstream-archive-changed) |
 | `ingest` stops naming contracts and categories | [Dataset — the source failed validation](#dataset--the-source-failed-validation) |
+| Every configuration scores the same on some category | [Test set — questions that answer themselves](#test-set--questions-that-answer-themselves) |
+| `build-testset` stops saying a stratum is short | [Test set — a stratum cannot be filled](#test-set--a-stratum-cannot-be-filled) |
+| A rebuilt test set no longer matches the committed one | [Test set — the set drifted](#test-set--the-set-drifted) |
 
 ---
 
@@ -125,6 +128,49 @@ until its failure modes are listed here.
   `test_colliding_contract_identifiers_are_rejected`, and
   `test_a_category_used_but_not_described_is_rejected`. The last of these caught a real
   mismatch in the published corpus on its first run against real data.
+
+---
+
+### Test set — questions that answer themselves
+
+- **What fails:** a question contains its own answer, so the system succeeds without
+  retrieving anything.
+- **Symptom:** every configuration scores identically on that category, and an A/B
+  comparison reports no difference where a real one exists. It looks like a stable
+  result rather than a broken one.
+- **Look first:** `answer_overlap` on the affected cases, and `max_answer_overlap` in
+  `testset/seed-v1.manifest.json`. Anything approaching 0.5 deserves reading by eye.
+- **Fix / recover:** reword the phrasing in `testset/templates.yaml` and rebuild, or let
+  the threshold exclude the case. Both change the test set's fingerprint, so results
+  from before the change are not comparable with results after.
+- **Prevented or caught by:** the overlap check at build time, which currently rejects
+  429 "Document Name" and 73 "Governing Law" cases. Not caught: a question answerable
+  from general knowledge without retrieval. That needs the no-context baseline, which
+  does not exist yet.
+
+### Test set — a stratum cannot be filled
+
+- **What fails:** a case type has fewer candidates than the build asks for, often
+  because the contract-per-case cap has exhausted the eligible contracts.
+- **Symptom:** `build-testset` stops with "wanted N, found M".
+- **Look first:** the counts by type in the corpus against the requested strata.
+- **Fix / recover:** lower the quota or raise the cap — deliberately. A category with
+  too few cases cannot support a claim about that category, so silently accepting a
+  short stratum would be worse than stopping.
+- **Prevented or caught by:** `tests/test_testset.py::test_a_stratum_that_cannot_be_filled_is_reported`.
+
+### Test set — the set drifted
+
+- **What fails:** rebuilding produces different cases from the committed ones.
+- **Symptom:** the fingerprint in the manifest changes without anyone intending it.
+- **Look first:** which input moved — the corpus fingerprint, the phrasings' fingerprint,
+  or the seed. All three are recorded in `testset/seed-v1.manifest.json`, so the
+  comparison is immediate.
+- **Fix / recover:** if the change was intended, commit the new set and treat earlier
+  results as belonging to a different test set, because they do. If it was not intended,
+  the corpus or the phrasings changed underneath you.
+- **Prevented or caught by:** `test_building_is_reproducible` and
+  `test_shipped_seed_set_is_intact`.
 
 ---
 

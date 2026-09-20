@@ -3,7 +3,8 @@
 How the harness is put together: what each piece owns, how information moves through it,
 and what it depends on from outside.
 
-**Status:** early. The configuration layer and the dataset layer exist. Sections fill in as the pieces
+**Status:** early. The configuration, dataset and test-set layers exist. Nothing yet
+retrieves, generates or judges. Sections fill in as the pieces
 they describe get built, so that nothing here is written speculatively.
 
 ---
@@ -23,6 +24,10 @@ an A/B comparison is two of these files differing in one field.
 | Ingestion | Fetching, verifying and writing a normalised dataset | Interpreting the contents | `src/rag_eval/dataset/ingest.py` |
 | Dataset loader | Reading a dataset back and proving it is unchanged | Chunking or embedding it | `src/rag_eval/dataset/loader.py` |
 | Dataset models | What a contract, a label and a manifest are | Where they came from | `src/rag_eval/dataset/models.py` |
+| Question templates | The phrasings used to ask about each clause category | Which cases get built | `testset/templates.yaml` |
+| Contract naming | Turning a filing title into a name a question can use | Uniqueness policy beyond its own checks | `src/rag_eval/testset/naming.py` |
+| Leakage check | Measuring whether a question gives away its answer | Deciding what to do about it | `src/rag_eval/testset/leakage.py` |
+| Test set builder | Selecting cases reproducibly from a corpus | Knowing how the corpus was loaded — it takes a protocol | `src/rag_eval/testset/build.py` |
 
 ## 2. Data flow
 
@@ -70,6 +75,26 @@ The timestamp is recorded but excluded from it, so ingesting the same data twice
 the same fingerprint. `verify` re-hashes every contract file and recomputes the
 fingerprint, which is what catches documents shifting underneath a comparison.
 
+### Building a test set
+
+```
+data/cuad/v1  +  testset/templates.yaml  +  seed
+        │
+        ▼
+  classify each label      extraction vs existence, answerable vs not
+  rank deterministically   sha256(seed | contract | category)
+  fill a phrasing          chosen by the same rank, so it is stable
+  measure answer overlap   reject at or above 0.5, and count the rejections
+  cap cases per contract   no document dominates the score
+        │
+        ▼
+testset/seed-v1.jsonl + seed-v1.manifest.json
+```
+
+The builder takes a `CorpusView` protocol rather than the concrete loaded dataset, so it
+does not depend on how the corpus arrived. That is the seam an external system will come
+through in Phase 14.
+
 ## 3. Diagram
 
 To be drawn once retrieval and generation exist and there is a full run to depict.
@@ -78,7 +103,7 @@ To be drawn once retrieval and generation exist and there is a full run to depic
 
 ```
 src/rag_eval/
-  __main__.py   command line: `python -m rag_eval ingest|verify`
+  __main__.py   command line: `python -m rag_eval ingest|verify|build-testset`
   config.py     the configuration model and its loader
   hashing.py    canonical serialisation and content fingerprints
   errors.py     the errors this package raises on purpose
@@ -87,6 +112,16 @@ src/rag_eval/
     cuad.py     the only file that knows CUAD's published format
     ingest.py   fetch, verify, normalise, write
     loader.py   read back and prove unchanged
+  testset/
+    models.py   what a test case is, and the five case types
+    templates.py  loading the hand-written phrasings
+    naming.py   filing title -> a name a question can use
+    leakage.py  does the question give away its answer?
+    build.py    reproducible, stratified case selection
+testset/
+  templates.yaml        82 phrasings, 41 categories — the file to review
+  seed-v1.jsonl         the 30 committed cases
+  seed-v1.manifest.json how they were built, and from what
 configs/
   baseline.yaml the starting configuration, the "A" of every comparison
 tests/
