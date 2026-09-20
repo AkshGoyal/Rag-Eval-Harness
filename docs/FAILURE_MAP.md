@@ -6,7 +6,7 @@ like from the outside, where to look first, and how to recover.
 This document is written from the symptom inwards, because that is the direction you
 read it in when something is broken.
 
-**Status:** covers the configuration, dataset, test-set and retrieval layers. Entries are added
+**Status:** covers the configuration, dataset, test-set, retrieval and model-call layers. Entries are added
 in the same step that builds the component they describe — a component is not "done"
 until its failure modes are listed here.
 
@@ -28,6 +28,10 @@ until its failure modes are listed here.
 | A rebuilt test set no longer matches the committed one | [Test set — the set drifted](#test-set--the-set-drifted) |
 | Every configuration scores near zero | [Retrieval — the question cannot reach its document](#retrieval--the-question-cannot-reach-its-document) |
 | Two identical runs rank chunks differently | [Retrieval — unstable ranking](#retrieval--unstable-ranking) |
+| Scores changed and no configuration did | [Model calls — the gateway switched provider](#model-calls--the-gateway-switched-provider) |
+| A rerun returns old answers under a new model's name | [Model calls — a stale cache entry](#model-calls--a-stale-cache-entry) |
+| A run stopped partway with a spending message | [Model calls — the budget cap tripped](#model-calls--the-budget-cap-tripped) |
+| Answers end mid-sentence | [Model calls — truncated output](#model-calls--truncated-output) |
 
 ---
 
@@ -207,6 +211,57 @@ until its failure modes are listed here.
   untrustworthy, because the variance has no bound you can state.
 - **Prevented or caught by:** `tests/test_pipeline.py::test_ties_break_by_document_order`
   and `::test_retrieval_is_deterministic`.
+
+---
+
+### Model calls — the gateway switched provider
+
+- **What fails:** OpenRouter routes the same model name to a different upstream
+  provider between two runs. Providers differ in quantisation and behaviour.
+- **Symptom:** scores move between runs whose configuration is identical, or an A/B
+  delta that is really a provider difference wearing a configuration's clothes.
+- **Look first:** `provider_served` on the call records for both runs. If they differ,
+  the comparison is invalid regardless of what the scores say.
+- **Fix / recover:** pin the provider in the request, which the wrapper does by setting
+  `allow_fallbacks: false`. Runs made without pinning cannot be repaired after the fact,
+  only repeated.
+- **Prevented or caught by:** `tests/test_llm.py::test_the_serving_provider_is_recorded`
+  and `::test_pinning_a_provider_disables_fallback`.
+
+### Model calls — a stale cache entry
+
+- **What fails:** something that changes a model's answer is not part of the cache key,
+  so a previous answer is served for a new configuration.
+- **Symptom:** none. This is the failure with no symptom — the answer is well-formed,
+  the run completes, the report looks ordinary, and the number is false.
+- **Look first:** whether the changed field appears in `ChatRequest` or
+  `EmbeddingRequest`. The key is the whole request, so a field missing from the model is
+  a field missing from the key. If in doubt, delete `.cache/` and rerun; a real
+  difference will reappear.
+- **Fix / recover:** add the field to the request model, then discard the cache
+  entirely. Entries written under the old key cannot be told apart from sound ones.
+- **Prevented or caught by:** the parametrised test asserting that model, prompt
+  version, temperature, output limit, provider and message content each change the key.
+
+### Model calls — the budget cap tripped
+
+- **What fails:** the run reached its spending limit.
+- **Symptom:** it stops with what was spent, the limit, and how many calls had been made.
+- **Look first:** whether the spend is plausible for the work. If it is far higher than
+  expected, suspect a loop rather than the prices.
+- **Fix / recover:** results up to that point are complete and usable; anything after it
+  was not attempted. Raise the limit deliberately or narrow the run — never remove the cap.
+- **Prevented or caught by:** `tests/test_llm.py::test_the_run_stops_at_its_spending_limit`.
+
+### Model calls — truncated output
+
+- **What fails:** the model hit its output limit mid-answer.
+- **Symptom:** answers ending mid-sentence, and judge scores that look unfairly harsh.
+- **Look first:** `truncated` on the call record. It is set from the provider's finish
+  reason, so a truncated answer is never scored as though the model chose to stop.
+- **Fix / recover:** raise `max_output_tokens` in the configuration and rerun. That
+  changes the cache key, so the affected calls are genuinely remade rather than reused.
+- **Prevented or caught by:** `tests/test_llm.py::test_a_truncated_answer_is_recorded_as_truncated`.
 
 ---
 

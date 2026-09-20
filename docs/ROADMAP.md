@@ -1,10 +1,10 @@
 # Roadmap
 
-**Current phase:** Phase 4 — Reference RAG pipeline (retrieval done; generation needs a key)
+**Current phase:** Phase 5 — Run harness core (model wrapper done; manifest and logs next)
 **Last updated:** 2026-09-19
-**Next action:** Phase 6 — retrieval metrics, which needs no API key and completes
-Milestone A. Generation and vector search both wait on credentials; Aksh's review of
-`testset/templates.yaml` is still open and can happen at any time.
+**Next action:** Aksh adds credit to OpenRouter, creates a key, and puts it in a local
+`.env`. Then dense embeddings and a vector index, then retrieval metrics — at which
+point keyword search and vector search can be compared honestly, which is Milestone A.
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.
@@ -20,7 +20,7 @@ under §1.6 of `CLAUDE.md`.
 | 2 | Corpus selection and ingestion | **complete** (2026-09-20) — D-003, D-007 |
 | 3 | Seed test set (v0) | **complete** (2026-09-20) — D-008; templates awaiting review |
 | 4 | Reference RAG pipeline | **retrieval complete** (2026-09-20) — D-009; generation blocked on a key |
-| 5 | Run harness core | not started |
+| 5 | Run harness core | **in progress** — model wrapper, cache, budget cap and retries done (D-010) |
 | 6 | Retrieval metrics — **Milestone A** | not started |
 | 7 | Test set v1 (full) | not started |
 | 8 | Judge | not started |
@@ -52,7 +52,7 @@ adjustment.
 | Total budget | **₹1000 (~$11–12), all costs** | Model tier is a budget decision, not a quality one. A hard in-code spend cap is required before the first uncached LLM call. |
 | Aksh's manual labelling time | **30–60 minutes, total** | Test cases are derived from CUAD annotations and spot-checked, never hand-authored. Judge calibration gets one overall agreement number, not per-category. |
 | Corpus | CUAD, CC BY 4.0 (D-003) | Retrieval labels come free from expert annotations. |
-| Models | Gemini Flash generator, GPT-4o-mini judge (D-005) | Two providers behind one wrapper. Self-preference bias is structurally impossible, not merely measured. |
+| Models | One OpenRouter key; small open-weight generator, different-family judge (D-010) | Self-preference bias is structurally impossible, not merely measured. Providers are pinned, because a gateway that reroutes silently would invalidate every comparison. |
 | Scope order | Generic harness, then adapter (D-004) | The harness never depends on any particular RAG system. |
 
 ### What the budget actually buys

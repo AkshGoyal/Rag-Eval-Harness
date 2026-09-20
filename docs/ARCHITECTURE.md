@@ -3,8 +3,9 @@
 How the harness is put together: what each piece owns, how information moves through it,
 and what it depends on from outside.
 
-**Status:** the configuration, dataset, test-set and retrieval layers exist. Nothing
-yet generates an answer or judges one. Sections fill in as the pieces
+**Status:** the configuration, dataset, test-set, retrieval and model-call layers
+exist. No model has actually been called yet — that needs a key, and the development
+environment has none. Sections fill in as the pieces
 they describe get built, so that nothing here is written speculatively.
 
 ---
@@ -30,6 +31,10 @@ an A/B comparison is two of these files differing in one field.
 | Test set builder | Selecting cases reproducibly from a corpus | Knowing how the corpus was loaded — it takes a protocol | `src/rag_eval/testset/build.py` |
 | Chunking | Splitting contracts into retrievable pieces at word boundaries | Deciding how big a chunk should be — that is configuration | `src/rag_eval/pipeline/chunking.py` |
 | BM25 index | Ranking chunks by keyword match, exactly and deterministically | Understanding meaning — it matches words, not ideas | `src/rag_eval/retrieval/bm25.py` |
+| Model client | Every call to every model: caching, retries, spend limit, provider pinning | Knowing what a prompt means — it moves requests, not intent | `src/rag_eval/llm/client.py` |
+| Response cache | Storing raw provider responses against a content key | Deciding what belongs in the key — the request models do that | `src/rag_eval/llm/cache.py` |
+| Budget guard | Stopping a run before it exceeds its spending limit | Estimating cost in advance | `src/rag_eval/llm/budget.py` |
+| Transport | One HTTP POST | Anything else — it exists so the rest can be tested offline | `src/rag_eval/llm/transport.py` |
 
 ## 2. Data flow
 
@@ -124,6 +129,40 @@ Retrieval is exact — every chunk is scored on every query — which is what al
 difference to be attributed to a configuration change rather than to an index that
 varies between builds.
 
+### A model call
+
+```
+ChatRequest / EmbeddingRequest
+  model, messages, prompt_version, temperature, max_tokens, provider
+        │
+        ▼
+  cache key = sha256 of the whole request
+        │
+        ├── hit  → cached response, zero cost, recorded as a hit
+        │
+        └── miss → budget check → HTTP POST (provider pinned, fallback off)
+                       │
+                       ├── 200        → cache it, record usage, cost, provider served
+                       ├── 429 / 5xx  → wait and retry, counting attempts
+                       └── 4xx        → stop; repeating a malformed request wastes money
+        │
+        ▼
+  Result + CallRecord
+    cache_hit, attempts, provider_requested, provider_served,
+    usage, cost_usd, truncated, latency, error
+```
+
+Everything in that record exists because leaving it out would let a number look sound
+when it is not. `truncated` marks an answer cut off at the output limit, so it is never
+scored as though the model chose to stop. `provider_served` catches the gateway quietly
+routing to a different upstream. `attempts` above one means the provider was unstable,
+which is invisible if retries are silent.
+
+The cache is the part most worth distrusting: a key that fails to change when an input
+changes returns an old answer under a new configuration's name, and nothing about the
+output looks wrong. Six separate tests assert that each field capable of changing an
+answer also changes the key.
+
 ## 3. Diagram
 
 To be drawn once retrieval and generation exist and there is a full run to depict.
@@ -147,6 +186,12 @@ src/rag_eval/
   retrieval/
     base.py     what every retriever provides
     bm25.py     keyword search over an inverted index
+  llm/
+    types.py    what a model call is, and what it produced
+    cache.py    content-addressed response cache
+    budget.py   the hard spending limit
+    transport.py  one HTTP POST, isolated so tests need no network
+    client.py   the single boundary between this project and any provider
   testset/
     models.py   what a test case is, and the five case types
     templates.py  loading the hand-written phrasings

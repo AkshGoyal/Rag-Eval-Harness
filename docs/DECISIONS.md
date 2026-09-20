@@ -14,11 +14,12 @@ isn't in this file, that's a bug in our process.
 | D-002 | Commits authored as Aksh, Claude as co-author | 1 | 2026-09-19 | active |
 | D-003 | Corpus is CUAD (510 annotated contracts, CC BY 4.0) | 2 | 2026-09-19 | active |
 | D-004 | Generic harness first, adapter for Aksh's chatbot second | 0 | 2026-09-19 | active |
-| D-005 | Asymmetric cross-provider models: Gemini generator, OpenAI judge | 1 | 2026-09-19 | **provisional default** — revisit at Phase 4 / Phase 8 |
+| D-005 | Asymmetric cross-provider models: Gemini generator, OpenAI judge | 1 | 2026-09-19 | **superseded by D-010** |
 | D-006 | Stack: Python + uv, YAML + Pydantic, exact NumPy retrieval, pytest | 1 | 2026-09-19 | active |
 | D-007 | Dataset normalised on ingest, fetched over plain HTTPS, fingerprinted | 2 | 2026-09-20 | active |
 | D-008 | Questions from hand-written templates; retrieval searches all 510 contracts | 3 | 2026-09-20 | **amended** — contracts named from their own text |
 | D-009 | Character chunking and BM25 keyword retrieval, both offline | 4 | 2026-09-20 | active |
+| D-010 | One gateway (OpenRouter), pinned providers, everything through one wrapper | 5 | 2026-09-20 | active |
 
 Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
@@ -524,6 +525,86 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
 - **When to revisit:** when API keys are available and vector search can be added as a
   second configuration, which is the first genuinely interesting A/B this project can run.
+
+- **Date:** 2026-09-20
+
+---
+
+## D-010 — One gateway, pinned providers, one wrapper — supersedes D-005
+
+- **Decision:** every model call — chat and embeddings alike — goes through
+  **OpenRouter**, on one key, via a single wrapper module. Starting models:
+
+  | Role | Model | Why this one |
+  |---|---|---|
+  | Embeddings | `openai/text-embedding-3-small` | Cheapest credible baseline, well understood |
+  | Generator | a small open-weight model, around Llama 3.1 8B | Cheap, and deliberately not strong |
+  | Judge | DeepSeek V4.1 Flash | Different family from the generator; reliable structured output |
+
+  Every one of these is a starting position, recorded so it can be argued with, not a
+  conclusion.
+
+- **Context:** Aksh asked for cheap open-weight models and had already signed up to
+  OpenRouter, which now serves embeddings as well as chat through one OpenAI-compatible
+  endpoint. That collapses what D-005 assumed would be two providers into one key.
+
+- **Alternatives considered:**
+  - *Separate providers for generation, judging and embeddings* (D-005's plan) —
+    superseded. It achieved cross-family judging by using different companies; one
+    gateway achieves the same thing by naming different models, with a third of the
+    setup.
+  - *Open-weight models run locally* — Aksh asked to keep everything on OpenRouter.
+    It would have been free and unlimited for embeddings, which matters because we
+    re-embed on every chunking change; the cost of that convenience is about ₹14 per
+    full index build, which the budget absorbs easily.
+  - *OpenRouter's free model tier* — rejected for measurement. Twenty requests a minute
+    and two hundred a day turns a 400-call evaluation into a two-day wait, and free
+    endpoints are the most likely to be quantised differently from the paid ones.
+    Fine for checking that a call works at all.
+
+- **Why the specific models:** the generator is deliberately modest, because a strong
+  model answers from general competence and prior knowledge and so conceals exactly the
+  retrieval differences the harness is built to expose. The judge is chosen for
+  dependable structured output rather than intelligence — one malformed response in ten
+  costs retries and contaminates results — and from a different family than the
+  generator, which makes self-preference bias structurally impossible rather than
+  something to correct for. The embedding model is the cheap baseline precisely so that
+  comparing it against `baai/bge-m3` becomes the project's first dense A/B. Which of
+  those two is better on contracts is a question this tool is built to answer, and
+  answering it by reading benchmark posts would be the behaviour it exists to replace.
+
+- **The risk that nearly went unnoticed:** OpenRouter routes a model name to whichever
+  upstream provider is cheapest or fastest at that moment, and providers differ in
+  quantisation, context limits and behaviour. Published rates for one model already
+  range from $0.32 to over $2 per million output tokens depending on who serves it. For
+  an ordinary application that routing is a feature. **Here it is a confound that would
+  silently invalidate every result**, because the harness's entire claim is that a score
+  difference was caused by a configuration change. The wrapper therefore pins the
+  provider, disables fallback, and records which provider actually served every call.
+
+- **Other risks / failure modes:** (1) the cache key failing to capture something that
+  changes an answer, which would serve a stale response under a new configuration's
+  name with nothing looking wrong; (2) a retry loop spending the budget; (3) an answer
+  truncated at the output limit being scored as though the model chose to stop; (4)
+  prices in this entry are from aggregators rather than OpenRouter itself, which is
+  blocked from the development environment, so they are unverified.
+
+- **How we'd detect it:** (1) is covered by a test asserting that each of six fields —
+  model, prompt version, temperature, output limit, provider and the messages — changes
+  the key; (2) by a hard spending limit checked before every call, which stops the run
+  and says how far it got rather than skipping the remainder quietly; (3) by recording
+  `truncated` on every call from the finish reason; (4) by Aksh checking the rates on
+  OpenRouter before the first paid run.
+
+- **A bug worth recording, because nothing would have shown it:** the first version of
+  the wrapper read from the cache and never wrote to it. Every call would have reached
+  the network, every rerun would have cost money again, and nothing would have looked
+  wrong — the results would have been correct, just repeatedly paid for. It was caught
+  by a test asserting the second identical call does not reach the transport.
+
+- **When to revisit:** the judge, after calibration in Phase 9 measures whether it
+  agrees with Aksh. The generator, once there is a reason to prefer a stronger one. The
+  embedding model, as soon as there are two to compare.
 
 - **Date:** 2026-09-20
 
