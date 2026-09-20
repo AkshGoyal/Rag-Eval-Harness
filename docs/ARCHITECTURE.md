@@ -3,7 +3,7 @@
 How the harness is put together: what each piece owns, how information moves through it,
 and what it depends on from outside.
 
-**Status:** early. Only the configuration layer exists. Sections fill in as the pieces
+**Status:** early. The configuration layer and the dataset layer exist. Sections fill in as the pieces
 they describe get built, so that nothing here is written speculatively.
 
 ---
@@ -19,6 +19,10 @@ an A/B comparison is two of these files differing in one field.
 | Configuration model | The shape of a valid configuration, and rejecting invalid ones at load time | Knowing what any setting *does* — it validates, it does not act | `src/rag_eval/config.py` |
 | Content hashing | Turning a structure into a stable fingerprint that depends on content alone | Deciding what gets hashed | `src/rag_eval/hashing.py` |
 | Errors | Carrying enough context to locate a problem — which file, which field | Recovering from anything | `src/rag_eval/errors.py` |
+| Corpus reader | Knowing what CUAD's published format looks like | Anything downstream — this is the only file that knows | `src/rag_eval/dataset/cuad.py` |
+| Ingestion | Fetching, verifying and writing a normalised dataset | Interpreting the contents | `src/rag_eval/dataset/ingest.py` |
+| Dataset loader | Reading a dataset back and proving it is unchanged | Chunking or embedding it | `src/rag_eval/dataset/loader.py` |
+| Dataset models | What a contract, a label and a manifest are | Where they came from | `src/rag_eval/dataset/models.py` |
 
 ## 2. Data flow
 
@@ -44,18 +48,45 @@ changed setting means a changed question.
 The configuration's `name` is excluded from the fingerprint on purpose. It is a label,
 not an input — renaming a configuration does not change a single answer it produces.
 
+### Ingestion
+
+```
+CUAD archive (HTTPS)
+        │   checked against a recorded fingerprint
+        ▼
+  CUADv1.json  ──►  parse, verifying every answer offset against the contract text
+        │
+        ▼
+data/cuad/v1/
+  contracts/*.txt     510 contracts, one file each
+  contracts.jsonl     index: id, title, sha256, length
+  labels.jsonl        20,910 rows; 6,702 with answer spans, 14,208 expert absences
+  categories.json     41 clause categories and their descriptions
+  manifest.json       source, counts, fingerprint, timestamp
+```
+
+The manifest's fingerprint covers the contract hashes, the labels and the categories.
+The timestamp is recorded but excluded from it, so ingesting the same data twice gives
+the same fingerprint. `verify` re-hashes every contract file and recomputes the
+fingerprint, which is what catches documents shifting underneath a comparison.
+
 ## 3. Diagram
 
-To be drawn once there is more than one path through the system. A diagram of three
-modules would be decoration.
+To be drawn once retrieval and generation exist and there is a full run to depict.
 
 ## 4. Module map
 
 ```
 src/rag_eval/
+  __main__.py   command line: `python -m rag_eval ingest|verify`
   config.py     the configuration model and its loader
   hashing.py    canonical serialisation and content fingerprints
   errors.py     the errors this package raises on purpose
+  dataset/
+    models.py   what a contract, label, span and manifest are
+    cuad.py     the only file that knows CUAD's published format
+    ingest.py   fetch, verify, normalise, write
+    loader.py   read back and prove unchanged
 configs/
   baseline.yaml the starting configuration, the "A" of every comparison
 tests/
@@ -70,6 +101,7 @@ tests/
 | pyyaml | Reading configuration files | Lockfile | Configuration format would change, not the design |
 | pytest, ruff, mypy | Tests, linting and formatting, type checking | Lockfile | Development friction only; nothing at runtime |
 
-No network calls, no credentials, and no model providers are reachable from the code yet.
+Ingestion makes one HTTPS download, using only the standard library. No credentials and
+no model providers are reachable from the code yet.
 Those arrive with the provider wrapper, which is the single place every model call will
 pass through.

@@ -6,7 +6,7 @@ like from the outside, where to look first, and how to recover.
 This document is written from the symptom inwards, because that is the direction you
 read it in when something is broken.
 
-**Status:** covers the configuration layer, which is all that exists. Entries are added
+**Status:** covers the configuration and dataset layers. Entries are added
 in the same step that builds the component they describe — a component is not "done"
 until its failure modes are listed here.
 
@@ -20,6 +20,9 @@ until its failure modes are listed here.
 | A run fails immediately with `Invalid configuration ...` | [Configuration — rejected at load](#configuration--rejected-at-load) |
 | Two runs you expect to match produce different fingerprints | [Hashing — fingerprint changed unexpectedly](#hashing--fingerprint-changed-unexpectedly) |
 | Tests pass locally but fail in CI | [Tooling — CI has no credentials](#tooling--ci-has-no-credentials) |
+| Scores moved and you did not change the configuration | [Dataset — documents changed underneath you](#dataset--documents-changed-underneath-you) |
+| `ingest` stops saying the fingerprint does not match | [Dataset — the upstream archive changed](#dataset--the-upstream-archive-changed) |
+| `ingest` stops naming contracts and categories | [Dataset — the source failed validation](#dataset--the-source-failed-validation) |
 
 ---
 
@@ -76,6 +79,52 @@ until its failure modes are listed here.
   it — which, once it exists, means the provider wrapper and nowhere else.
 - **Prevented or caught by:** `tests/test_no_keys.py`, and the CI workflow having no
   secrets configured at all.
+
+---
+
+### Dataset — documents changed underneath you
+
+- **What fails:** a contract file is edited, truncated or replaced after ingestion.
+- **Symptom:** scores move between runs you expected to match, and the configuration
+  change you happened to make takes the blame. Extremely hard to diagnose from the
+  numbers alone, which is why it is checked rather than reasoned about.
+- **Look first:** `uv run python -m rag_eval verify --dataset data/cuad/v1`. It re-hashes
+  every contract file against the index and names each one that no longer matches.
+- **Fix / recover:** re-run `ingest`. Any run made against the altered data is invalid
+  and must be discarded — its recorded fingerprint will not match the fresh one, which
+  is how you can tell which runs are affected.
+- **Prevented or caught by:** `tests/test_dataset.py::test_loader_detects_a_contract_edited_after_ingestion`.
+
+### Dataset — the upstream archive changed
+
+- **What fails:** the published archive no longer matches the fingerprint recorded in
+  `src/rag_eval/dataset/ingest.py`.
+- **Symptom:** `ingest` stops before unpacking anything, printing the expected and the
+  actual fingerprint.
+- **Look first:** the two fingerprints in the message. A difference means the upstream
+  file genuinely changed, not that anything local is broken.
+- **Fix / recover:** decide deliberately. If the new upstream data is wanted, update the
+  recorded fingerprints and bump the dataset version, because results from the old data
+  are no longer comparable with results from the new. Never update the fingerprint
+  simply to make the command pass.
+- **Prevented or caught by:** `tests/test_dataset.py::test_source_fingerprint_mismatch_stops_ingestion`.
+
+### Dataset — the source failed validation
+
+- **What fails:** an answer offset does not point at the text it claims to, two
+  contracts collapse to the same identifier, or a category in the labels has no
+  description.
+- **Symptom:** `ingest` stops and lists up to ten problems, each naming the contract and
+  category involved.
+- **Look first:** the message. The offset check is the important one — if answer
+  positions drift, every retrieval score built on them is wrong while looking entirely
+  reasonable.
+- **Fix / recover:** nothing has been written, so nothing is corrupted. The fault is in
+  the source data or in `cuad.py`, and it needs understanding rather than suppressing.
+- **Prevented or caught by:** `test_a_wrong_offset_is_rejected_and_named`,
+  `test_colliding_contract_identifiers_are_rejected`, and
+  `test_a_category_used_but_not_described_is_rejected`. The last of these caught a real
+  mismatch in the published corpus on its first run against real data.
 
 ---
 

@@ -1,0 +1,5 @@
+﻿Category (incl. context and answer),Description,Answer Format,Group
+Category: Document Name,Description: The name of the contract,Answer Format: Contract Name,Group: -
+Category: Governing Law,Description: Which state's law governs,Answer Format: State,Group: 1
+Category: Cap On Liability,Description: The liability ceiling,Answer Format: Amount,Group: 2
+Category: Source Code Escrow,Description: Whether source is escrowed,Answer Format: Yes/No,Group: 3

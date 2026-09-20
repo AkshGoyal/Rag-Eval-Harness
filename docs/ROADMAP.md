@@ -1,10 +1,10 @@
 # Roadmap
 
-**Current phase:** Phase 2 — Corpus selection and ingestion (not started)
+**Current phase:** Phase 3 — Seed test set (not started)
 **Last updated:** 2026-09-19
-**Next action:** Phase 2 — get CUAD onto disk, versioned and hashed. The first thing to
-settle is where it is fetched from, because this session's network policy blocks the
-usual sources (see Phase 2 below).
+**Next action:** Phase 3 — turn CUAD's annotation instructions into natural questions
+and build a small, verified seed test set. This is the hardest part of the project and
+the part with the most judgment in it.
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.
@@ -17,7 +17,7 @@ under §1.6 of `CLAUDE.md`.
 |-------|------|--------|
 | 0 | Discovery and working agreement | **complete** (2026-09-19) |
 | 1 | Repo home and stack selection | **complete** (2026-09-19) — D-001, D-005, D-006 |
-| 2 | Corpus selection and ingestion | corpus chosen (D-003), ingestion not started |
+| 2 | Corpus selection and ingestion | **complete** (2026-09-20) — D-003, D-007 |
 | 3 | Seed test set (v0) | not started |
 | 4 | Reference RAG pipeline | not started |
 | 5 | Run harness core | not started |

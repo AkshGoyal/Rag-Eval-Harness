@@ -48,9 +48,33 @@ alternatives (score threshold, binary verdict, conjunction of criteria).
 
 ## 3. The test set
 
-- **Provenance:** _TBD_ — corpus, licence, and how cases were derived from it.
-- **How cases were written:** _TBD_ — by hand, synthesised, or adapted from an existing
-  benchmark, and who checked each reference answer.
+- **Provenance:** the Contract Understanding Atticus Dataset (CUAD), licensed CC BY 4.0
+  — 510 commercial contracts filed publicly with the SEC, annotated by legal experts.
+  Ingested from the project's GitHub repository and fingerprinted; see D-003 and D-007.
+
+  What the corpus gives us, before any test case is written:
+
+  | | Count | What it is for |
+  |---|---|---|
+  | Contracts | 510 | The documents retrieval searches |
+  | Question-and-contract pairs | 20,910 | The pool test cases are drawn from |
+  | — with an answer, located exactly | 6,702 | Retrieval ground truth, free of charge |
+  | — expert-confirmed absent | 14,208 | Cases where refusing is the correct answer |
+  | Clause categories | 41 | The basis of the category taxonomy |
+
+  Two properties matter more than the counts. Every one of the 13,823 answer spans was
+  checked against its contract's text at ingestion, and all of them are correct, so the
+  answer locations can be trusted as ground truth rather than sampled and hoped for.
+  And the categories vary enormously in how often they appear — "Document Name" is in
+  all 510 contracts, "Source Code Escrow" in 13 — which gives graded difficulty without
+  anyone having to guess what is hard.
+- **How cases were written:** _TBD, Phase 3._ The known problem: CUAD's questions are
+  annotation instructions, not questions. They read "Highlight the parts (if any) of
+  this contract related to 'Governing Law' that should be reviewed by a lawyer." Feeding
+  those to the harness would measure how well a RAG system follows labelling
+  instructions, which is not the thing under test. Turning them into natural questions
+  is the central task of Phase 3, and its main risk is writing questions that contain
+  their own answers, which would flatter retrieval.
 - **Category definitions:** _TBD_ — each category with its inclusion rule and a worked
   example, so that two people would classify a new case the same way.
 - **Leakage checks:** _TBD_ — how we verify a question is not answerable from its own

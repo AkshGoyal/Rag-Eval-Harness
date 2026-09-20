@@ -1,0 +1,102 @@
+{
+ "version": "mini_v1",
+ "data": [
+  {
+   "title": "ALPHA_CORP-EX-10-DISTRIBUTION AGREEMENT",
+   "paragraphs": [
+    {
+     "context": "EXHIBIT 10.1\n\nDISTRIBUTION AGREEMENT\n\nThis Agreement is governed by the laws of Delaware.\n\nLiability is capped at $1,000,000 for direct damages and in aggregate thereafter.\n",
+     "qas": [
+      {
+       "id": "ALPHA_CORP-EX-10-DISTRIBUTION AGREEMENT__Document Name",
+       "question": "Highlight the parts (if any) of this contract related to \"Document Name\".",
+       "answers": [
+        {
+         "text": "DISTRIBUTION AGREEMENT",
+         "answer_start": 14
+        }
+       ],
+       "is_impossible": false
+      },
+      {
+       "id": "ALPHA_CORP-EX-10-DISTRIBUTION AGREEMENT__Governing Law",
+       "question": "Highlight the parts (if any) of this contract related to \"Governing Law\".",
+       "answers": [
+        {
+         "text": "the laws of Delaware",
+         "answer_start": 68
+        }
+       ],
+       "is_impossible": false
+      },
+      {
+       "id": "ALPHA_CORP-EX-10-DISTRIBUTION AGREEMENT__Cap On Liability",
+       "question": "Highlight the parts (if any) of this contract related to \"Cap On Liability\".",
+       "answers": [
+        {
+         "text": "capped at $1,000,000",
+         "answer_start": 104
+        },
+        {
+         "text": "in aggregate",
+         "answer_start": 148
+        }
+       ],
+       "is_impossible": false
+      },
+      {
+       "id": "ALPHA_CORP-EX-10-DISTRIBUTION AGREEMENT__Source Code Escrow",
+       "question": "Highlight the parts (if any) of this contract related to \"Source Code Escrow\".",
+       "answers": [],
+       "is_impossible": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "ALPHA_CORP EX 10 DISTRIBUTION AGREEMENT",
+   "paragraphs": [
+    {
+     "context": "EXHIBIT 4.2\n\nSUPPLY AGREEMENT\n\nThis Agreement shall be governed by the laws of New York.\n",
+     "qas": [
+      {
+       "id": "BETA_LLC-EX-4-SUPPLY AGREEMENT__Document Name",
+       "question": "Highlight the parts (if any) of this contract related to \"Document Name\".",
+       "answers": [
+        {
+         "text": "SUPPLY AGREEMENT",
+         "answer_start": 13
+        }
+       ],
+       "is_impossible": false
+      },
+      {
+       "id": "BETA_LLC-EX-4-SUPPLY AGREEMENT__Governing Law",
+       "question": "Highlight the parts (if any) of this contract related to \"Governing Law\".",
+       "answers": [
+        {
+         "text": "the laws of New York",
+         "answer_start": 67
+        }
+       ],
+       "is_impossible": false
+      },
+      {
+       "id": "BETA_LLC-EX-4-SUPPLY AGREEMENT__Cap On Liability",
+       "question": "Highlight the parts (if any) of this contract related to \"Cap On Liability\".",
+       "answers": [],
+       "is_impossible": true
+      },
+      {
+       "id": "BETA_LLC-EX-4-SUPPLY AGREEMENT__Source Code Escrow",
+       "question": "Highlight the parts (if any) of this contract related to \"Source Code Escrow\".",
+       "answers": [],
+       "is_impossible": true
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

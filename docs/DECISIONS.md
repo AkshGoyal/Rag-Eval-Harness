@@ -16,6 +16,7 @@ isn't in this file, that's a bug in our process.
 | D-004 | Generic harness first, adapter for Aksh's chatbot second | 0 | 2026-09-19 | active |
 | D-005 | Asymmetric cross-provider models: Gemini generator, OpenAI judge | 1 | 2026-09-19 | **provisional default** — revisit at Phase 4 / Phase 8 |
 | D-006 | Stack: Python + uv, YAML + Pydantic, exact NumPy retrieval, pytest | 1 | 2026-09-19 | active |
+| D-007 | Dataset normalised on ingest, fetched over plain HTTPS, fingerprinted | 2 | 2026-09-20 | active |
 
 Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
@@ -309,6 +310,68 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
   adapter points the harness at a system whose index we do not control.
 
 - **Date:** 2026-09-19
+
+---
+
+## D-007 — The corpus is normalised at the door and fingerprinted
+
+- **Decision:** ingestion downloads CUAD's archive over plain HTTPS from the project's
+  GitHub repository, checks it against a recorded fingerprint, and converts it into our
+  own shape: one text file per contract, one row per contract-and-category label, the
+  category descriptions, and a manifest. A second command reads the result back and
+  proves nothing has changed since. None of it is committed; the repository holds the
+  code and the fingerprints.
+
+- **Context:** the published sources for CUAD — Hugging Face, Zenodo, arXiv — are all
+  refused by this session's egress policy. GitHub raw downloads are not, and the CUAD
+  repository carries the full dataset as an 18 MB archive in its root, so a plain HTTPS
+  fetch works both here and on a developer machine with no git involved.
+
+- **Alternatives considered:**
+  - *Keep CUAD's own JSON and record a hash of it* — rejected: every downstream
+    component would learn CUAD's layout, and that shape would then have to be emulated
+    by the Phase 14 adapter for an entirely different system.
+  - *A one-time manual download, with ingestion reading only from disk* — the fallback
+    had the fetch failed. Cleaner in one respect, since acquiring and processing are
+    genuinely separate concerns, but it would have made ingestion untestable in this
+    environment and slowed every iteration to a message round-trip.
+  - *Commit a sample of contracts to the repository* — deferred rather than rejected.
+    Its value is letting someone clone and immediately see the harness work, which
+    matters at Phase 13 when there is a demo worth showing, not now.
+
+- **Why this one:** it keeps every CUAD-specific quirk inside a single file, it runs in
+  seconds, and it makes the corpus something a run can *prove* it used rather than
+  assume.
+
+- **What the data turned out to contain:** 510 contracts, 20,910 question-and-contract
+  pairs, of which 6,702 carry an answer with verified character offsets and 14,208 are
+  expert-confirmed absences. Those absences are the "should refuse" cases we expected to
+  have to write ourselves. All 13,823 answer spans were checked against the contract
+  text at ingestion and every one is correct.
+
+- **Risks / failure modes:** (1) the upstream archive could change or be removed, which
+  the recorded fingerprint turns from a silent corruption into a loud stop but does not
+  prevent; (2) ingestion normalises, and a normalisation bug would be invisible because
+  the output looks plausible; (3) the fingerprint would be worthless if anything
+  time-varying leaked into it.
+
+- **How we'd detect it:** (1) `ingest` fails with the expected and actual fingerprints
+  side by side; (2) the parser checks every answer offset against the text it claims to
+  describe, which is the check that would catch text being altered in transit;
+  (3) a test ingests twice and requires identical fingerprints, and the timestamp is
+  recorded in the manifest but deliberately excluded from the hash.
+
+- **A quirk worth recording:** CUAD names its 41 categories twice and the spellings
+  disagree. The question identifiers are mechanically title-cased ("Ip Ownership
+  Assignment", "Cap On Liability") while the description CSV carries what a person
+  wrote ("IP Ownership Assignment", "Cap on Liability"). Matching ignores case and the
+  human spelling wins. This was found by the coverage check failing on the real corpus
+  rather than by reading the files, which is the check earning its place.
+
+- **When to revisit:** if the upstream archive moves, or if a second corpus is added and
+  the normalised shape turns out to be CUAD-flavoured after all.
+
+- **Date:** 2026-09-20
 
 ---
 
