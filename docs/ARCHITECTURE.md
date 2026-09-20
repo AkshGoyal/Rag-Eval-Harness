@@ -3,8 +3,8 @@
 How the harness is put together: what each piece owns, how information moves through it,
 and what it depends on from outside.
 
-**Status:** early. The configuration, dataset and test-set layers exist. Nothing yet
-retrieves, generates or judges. Sections fill in as the pieces
+**Status:** the configuration, dataset, test-set and retrieval layers exist. Nothing
+yet generates an answer or judges one. Sections fill in as the pieces
 they describe get built, so that nothing here is written speculatively.
 
 ---
@@ -28,6 +28,8 @@ an A/B comparison is two of these files differing in one field.
 | Contract naming | Turning a filing title into a name a question can use | Uniqueness policy beyond its own checks | `src/rag_eval/testset/naming.py` |
 | Leakage check | Measuring whether a question gives away its answer | Deciding what to do about it | `src/rag_eval/testset/leakage.py` |
 | Test set builder | Selecting cases reproducibly from a corpus | Knowing how the corpus was loaded — it takes a protocol | `src/rag_eval/testset/build.py` |
+| Chunking | Splitting contracts into retrievable pieces at word boundaries | Deciding how big a chunk should be — that is configuration | `src/rag_eval/pipeline/chunking.py` |
+| BM25 index | Ranking chunks by keyword match, exactly and deterministically | Understanding meaning — it matches words, not ideas | `src/rag_eval/retrieval/bm25.py` |
 
 ## 2. Data flow
 
@@ -95,6 +97,33 @@ The builder takes a `CorpusView` protocol rather than the concrete loaded datase
 does not depend on how the corpus arrived. That is the seam an external system will come
 through in Phase 14.
 
+### Retrieval
+
+```
+contracts + chunking config
+        │
+        ▼
+  chunk_text()            fixed character budget, cut at whitespace
+        │                 15,444 chunks at the 2,000-character default
+        ▼
+  BM25Index               inverted index: word -> chunks containing it
+        │                 a dense chunk-by-word matrix would need ~3 GB
+        ▼
+  search(question, k)     exact scoring, ties broken by document order
+        │
+        ▼
+  Retrieved(rank, score, chunk)
+```
+
+Chunks carry their character offsets into the contract, so a retrieved chunk can be
+checked against a gold answer span directly. Any overlap counts as finding it: an answer
+split by a chunk boundary is still partly present in both, and scoring that as a miss
+would understate what the retriever did.
+
+Retrieval is exact — every chunk is scored on every query — which is what allows a score
+difference to be attributed to a configuration change rather than to an index that
+varies between builds.
+
 ## 3. Diagram
 
 To be drawn once retrieval and generation exist and there is a full run to depict.
@@ -112,6 +141,12 @@ src/rag_eval/
     cuad.py     the only file that knows CUAD's published format
     ingest.py   fetch, verify, normalise, write
     loader.py   read back and prove unchanged
+  pipeline/
+    chunking.py splitting a contract into retrievable pieces
+    corpus.py   chunking every contract, in a stable order
+  retrieval/
+    base.py     what every retriever provides
+    bm25.py     keyword search over an inverted index
   testset/
     models.py   what a test case is, and the five case types
     templates.py  loading the hand-written phrasings
@@ -134,7 +169,11 @@ tests/
 |---|---|---|---|
 | pydantic | Validating configuration and rejecting bad input at load | Lockfile | Validation would be hand-written; the failure modes would move from loud to quiet |
 | pyyaml | Reading configuration files | Lockfile | Configuration format would change, not the design |
+| numpy | Vectorised BM25 scoring | Lockfile | Scoring would be a Python loop: correct, much slower |
 | pytest, ruff, mypy | Tests, linting and formatting, type checking | Lockfile | Development friction only; nothing at runtime |
+
+Deliberately absent: a tokeniser. `tiktoken` downloads its vocabulary at first use, which
+would put a network call inside a suite that must run offline. See D-009.
 
 Ingestion makes one HTTPS download, using only the standard library. No credentials and
 no model providers are reachable from the code yet.

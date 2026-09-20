@@ -26,8 +26,23 @@ _TBD._ One entry per metric, using the template below.
 
 ### 1.1 Retrieval metrics
 
-_TBD._ Scored separately from generation, so that a failing case can be attributed to
-"retrieval missed the source" or "generator misused good context".
+Scored separately from generation, so that a failing case can be attributed to
+"retrieval missed the source" or "generator misused good context". The formal metrics
+arrive in Phase 6; what exists now is the primitive they are built on.
+
+**Did retrieval find the gold passage?** A retrieved chunk counts as finding a gold
+answer when it comes from the right contract *and* its character range overlaps the
+annotated span at all.
+
+- **What it can't detect:** whether the retrieved chunk contains *enough* of the answer.
+  A chunk holding the last three words of a clause counts the same as one holding all of
+  it. Partial credit is deliberate — an answer split by a chunk boundary is still partly
+  present in both neighbours, and scoring that as a miss would understate what the
+  retriever did — but it does mean recall is an optimistic measure at small chunk sizes.
+- **Known bias:** larger chunks are more likely to overlap a span by luck, so recall
+  rises with chunk size for reasons that have nothing to do with search quality. The
+  measured numbers show this and the non-monotonic recall@1 shows its limit.
+- **Where it's implemented:** `Chunk.covers` in `src/rag_eval/pipeline/chunking.py`.
 
 ### 1.2 Generation metrics
 

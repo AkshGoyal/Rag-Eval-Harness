@@ -14,9 +14,9 @@
     "not_stated": 3
   },
   "excluded_for_leakage": 9,
-  "max_answer_overlap": 0.1818,
+  "max_answer_overlap": 0.3636,
   "overlap_threshold": 0.5,
-  "content_hash": "28a811b4851e178577ef54c51084988d2e829d4dd64824670ab866bdba027b27",
+  "content_hash": "d0e9811bc521f5a43a602d3c4a3f971c38046d9d21f76e78d529da7e6b79e27a",
   "built_by": "0.1.0",
-  "created_at": "2026-09-20T08:30:19+00:00"
+  "created_at": "2026-09-20T08:45:25+00:00"
 }

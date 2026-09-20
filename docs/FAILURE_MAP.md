@@ -6,7 +6,7 @@ like from the outside, where to look first, and how to recover.
 This document is written from the symptom inwards, because that is the direction you
 read it in when something is broken.
 
-**Status:** covers the configuration, dataset and test-set layers. Entries are added
+**Status:** covers the configuration, dataset, test-set and retrieval layers. Entries are added
 in the same step that builds the component they describe — a component is not "done"
 until its failure modes are listed here.
 
@@ -26,6 +26,8 @@ until its failure modes are listed here.
 | Every configuration scores the same on some category | [Test set — questions that answer themselves](#test-set--questions-that-answer-themselves) |
 | `build-testset` stops saying a stratum is short | [Test set — a stratum cannot be filled](#test-set--a-stratum-cannot-be-filled) |
 | A rebuilt test set no longer matches the committed one | [Test set — the set drifted](#test-set--the-set-drifted) |
+| Every configuration scores near zero | [Retrieval — the question cannot reach its document](#retrieval--the-question-cannot-reach-its-document) |
+| Two identical runs rank chunks differently | [Retrieval — unstable ranking](#retrieval--unstable-ranking) |
 
 ---
 
@@ -171,6 +173,40 @@ until its failure modes are listed here.
   the corpus or the phrasings changed underneath you.
 - **Prevented or caught by:** `test_building_is_reproducible` and
   `test_shipped_seed_set_is_intact`.
+
+---
+
+### Retrieval — the question cannot reach its document
+
+- **What fails:** the question names its contract using words that do not appear in that
+  contract, so nothing in the query can identify the right document.
+- **Symptom:** recall near zero across every configuration. It looks like a broken
+  retriever or a hopeless task; it is neither. This happened for real: names derived from
+  filing identifiers squash the company into one token ("lejuholdingsltd") that exists
+  nowhere in the corpus, and recall was 0 of 19.
+- **Look first:** take one failing question, tokenise it, and check each word against the
+  target contract's text. A distinctive word that appears in neither the corpus vocabulary
+  nor the target document is the whole answer.
+- **Fix / recover:** name contracts with text drawn from the documents themselves — the
+  expert "Document Name" and "Parties" annotations are quotations from the contract. The
+  test set has to be rebuilt, which changes its fingerprint, so earlier results are not
+  comparable.
+- **Prevented or caught by:** nothing automatic yet. It was caught by running retrieval
+  end to end on real data at the first opportunity. A floor-effect check — refusing to
+  report an A/B when every configuration scores zero — belongs in the metrics phase.
+
+### Retrieval — unstable ranking
+
+- **What fails:** two chunks score identically and the order between them varies, so a
+  rerun of an unchanged configuration produces a different ranking.
+- **Symptom:** small, inexplicable deltas between runs that should be identical, which
+  would be read as noise or, worse, as a real regression.
+- **Look first:** `BM25Index.search` breaks ties by document order through `np.lexsort`.
+  If that is removed, ties fall back to whatever order the sort happens to produce.
+- **Fix / recover:** restore the tie-break. Any A/B run made while it was absent is
+  untrustworthy, because the variance has no bound you can state.
+- **Prevented or caught by:** `tests/test_pipeline.py::test_ties_break_by_document_order`
+  and `::test_retrieval_is_deterministic`.
 
 ---
 

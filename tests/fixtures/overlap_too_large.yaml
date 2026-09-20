@@ -4,7 +4,7 @@ corpus:
   version: v1
   hash: null
 chunking:
-  strategy: fixed_token
+  strategy: fixed_char
   size: 512
   overlap: 512
 embedding:

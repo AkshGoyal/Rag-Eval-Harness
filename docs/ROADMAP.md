@@ -1,10 +1,10 @@
 # Roadmap
 
-**Current phase:** Phase 4 — Reference RAG pipeline (not started)
+**Current phase:** Phase 4 — Reference RAG pipeline (retrieval done; generation needs a key)
 **Last updated:** 2026-09-19
-**Next action:** Aksh reviews `testset/templates.yaml` — 82 phrasings, about fifteen
-minutes, and the highest-leverage review in the project because a bad phrasing quietly
-weakens every case in its category. Then Phase 4 builds the reference pipeline.
+**Next action:** Phase 6 — retrieval metrics, which needs no API key and completes
+Milestone A. Generation and vector search both wait on credentials; Aksh's review of
+`testset/templates.yaml` is still open and can happen at any time.
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.
@@ -19,7 +19,7 @@ under §1.6 of `CLAUDE.md`.
 | 1 | Repo home and stack selection | **complete** (2026-09-19) — D-001, D-005, D-006 |
 | 2 | Corpus selection and ingestion | **complete** (2026-09-20) — D-003, D-007 |
 | 3 | Seed test set (v0) | **complete** (2026-09-20) — D-008; templates awaiting review |
-| 4 | Reference RAG pipeline | not started |
+| 4 | Reference RAG pipeline | **retrieval complete** (2026-09-20) — D-009; generation blocked on a key |
 | 5 | Run harness core | not started |
 | 6 | Retrieval metrics — **Milestone A** | not started |
 | 7 | Test set v1 (full) | not started |

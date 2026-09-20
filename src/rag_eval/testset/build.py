@@ -20,7 +20,7 @@ from rag_eval.errors import DatasetError
 from rag_eval.hashing import JSONValue, sha256_of
 from rag_eval.testset.leakage import answer_overlap
 from rag_eval.testset.models import CaseType, TestCase, TestSetManifest
-from rag_eval.testset.naming import unique_display_names
+from rag_eval.testset.naming import display_name, ensure_unique, name_from_annotations
 from rag_eval.testset.templates import Style, TemplateSet
 
 
@@ -105,6 +105,28 @@ def reference_answer(label: ClauseLabel, case_type: CaseType) -> str:
     return " ... ".join(span.text.strip() for span in label.spans)
 
 
+def _preferred_names(dataset: CorpusView) -> dict[str, str]:
+    """Name each contract with text drawn from the contract itself where possible."""
+    document_names: dict[str, tuple[str, ...]] = {}
+    parties: dict[str, tuple[str, ...]] = {}
+    for label in dataset.labels:
+        if not label.present:
+            continue
+        if label.category == "Document Name":
+            document_names[label.contract_id] = tuple(span.text for span in label.spans)
+        elif label.category == "Parties":
+            parties[label.contract_id] = tuple(span.text for span in label.spans)
+
+    return {
+        entry.contract_id: name_from_annotations(
+            document_names.get(entry.contract_id, ()),
+            parties.get(entry.contract_id, ()),
+            display_name(entry.title),
+        )
+        for entry in dataset.contracts
+    }
+
+
 def _rank(seed: str, key: str) -> str:
     """Derive a stable ordering key: same inputs, same order, always."""
     return hashlib.sha256(f"{seed}|{key}".encode()).hexdigest()
@@ -132,7 +154,10 @@ def build_testset(
     if missing:
         raise DatasetError("templates", [f"no phrasing for category {name!r}" for name in missing])
 
-    names = unique_display_names({entry.contract_id: entry.title for entry in dataset.contracts})
+    names = ensure_unique(
+        _preferred_names(dataset),
+        {entry.contract_id: entry.title for entry in dataset.contracts},
+    )
 
     candidates: dict[CaseType, list[tuple[str, ClauseLabel]]] = {
         case_type: [] for case_type in CaseType

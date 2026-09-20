@@ -54,29 +54,28 @@ def display_name(title: str) -> str:
     return f"the {company} {kind}"
 
 
-def unique_display_names(titles: dict[str, str]) -> dict[str, str]:
-    """Map contract ids to distinct readable names.
+def ensure_unique(names: dict[str, str], titles: dict[str, str]) -> dict[str, str]:
+    """Make a set of proposed contract names distinct, without re-deriving them.
 
-    Where two contracts would share a name, the filing year is added to tell them
-    apart, and failing that an ordinal, assigned in sorted order so it is stable
-    between runs.
+    Takes names that are already final and only resolves collisions: first by adding
+    the filing year, then by an ordinal assigned in sorted order so it is stable
+    between runs. Kept separate from deriving a name because feeding a finished name
+    back through the deriver mangles it — which is exactly what happened once,
+    producing "the The Beijing Sina ..." and re-title-casing "SINA".
 
     Raises:
         DatasetError: if two contracts remain indistinguishable, which would make any
             question naming them ambiguous and the case unanswerable as posed.
     """
-    proposed = {cid: display_name(title) for cid, title in titles.items()}
-    counts = _counts(proposed)
-
+    counts = _counts(names)
     resolved: dict[str, str] = {}
-    for contract_id, name in proposed.items():
+    for contract_id, name in names.items():
         if counts[name] > 1:
-            year = _YEAR.search(titles[contract_id])
+            year = _YEAR.search(titles.get(contract_id, ""))
             name = f"{name} ({year.group()})" if year else name
         resolved[contract_id] = name
 
-    counts = _counts(resolved)
-    for name, count in counts.items():
+    for name, count in _counts(resolved).items():
         if count == 1:
             continue
         sharing = sorted(cid for cid, value in resolved.items() if value == name)
@@ -92,8 +91,98 @@ def unique_display_names(titles: dict[str, str]) -> dict[str, str]:
     return resolved
 
 
+def unique_display_names(titles: dict[str, str]) -> dict[str, str]:
+    """Derive distinct names from filing titles alone. Used where annotations are absent."""
+    return ensure_unique({cid: display_name(title) for cid, title in titles.items()}, titles)
+
+
 def _counts(names: dict[str, str]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for name in names.values():
         counts[name] = counts.get(name, 0) + 1
     return counts
+
+
+_CORPORATE = re.compile(
+    r"\b(inc|llc|ltd|limited|corp|corporation|company|co|plc|gmbh|ag|sa|nv|bv|lp|llp)\b\.?",
+    re.IGNORECASE,
+)
+_NOISE = re.compile(r"^[\s(\"']|parties|referred|hereinafter|foregoing|collectively", re.IGNORECASE)
+_PLACEHOLDER = frozenset(
+    {
+        "company",
+        "consultant",
+        "contractor",
+        "customer",
+        "distributor",
+        "licensee",
+        "licensor",
+        "party",
+        "purchaser",
+        "recipient",
+        "reseller",
+        "seller",
+        "supplier",
+        "vendor",
+    }
+)
+"""Words a contract uses instead of naming a party. "The Company Services Agreement"
+identifies nothing, so a span that reduces to one of these is not a usable name."""
+_LEADING_THE = re.compile(r"^the\s+", re.IGNORECASE)
+
+
+def _readable(text: str) -> str:
+    """Soften shouting without mangling names that already carry their own casing."""
+    collapsed = _SEPARATORS.sub(" ", text).strip(" \"'(),.")
+    letters = [c for c in collapsed if c.isalpha()]
+    if letters and sum(c.isupper() for c in letters) / len(letters) > 0.7:
+        return collapsed.title()
+    return collapsed
+
+
+def _best_party(spans: tuple[str, ...]) -> str:
+    """Choose the span most likely to be an entity name rather than prose.
+
+    CUAD's "Parties" annotation captures whatever identifies the signatories, which is
+    sometimes a clean company name and sometimes a fragment of the sentence that
+    introduces them. Preferring a corporate suffix picks out the former.
+    """
+    candidates = [
+        _readable(span)
+        for span in spans
+        if span.strip() and not _NOISE.match(span.strip()) and len(span.strip()) <= 60
+    ]
+    candidates = [
+        stripped
+        for candidate in candidates
+        if len(stripped := _LEADING_THE.sub("", candidate)) >= 3
+        and stripped.lower().strip(".,") not in _PLACEHOLDER
+    ]
+    if not candidates:
+        return ""
+    with_suffix = [candidate for candidate in candidates if _CORPORATE.search(candidate)]
+    pool = with_suffix or candidates
+    return min(pool, key=lambda candidate: (len(candidate), candidate))
+
+
+def name_from_annotations(
+    document_name: tuple[str, ...], parties: tuple[str, ...], fallback: str
+) -> str:
+    """Name a contract using words that actually appear inside it.
+
+    A name derived from the filing identifier is unusable for retrieval: identifiers
+    squash the company into one token ("lejuholdingsltd") that appears nowhere in the
+    corpus, so the only part of a question capable of identifying the right contract
+    matches nothing and search returns generic passages from arbitrary documents. The
+    expert annotations give us what the contract calls itself and who signed it, both
+    of which are quotations from the text.
+
+    Falls back to the filing title when a contract lacks the annotations.
+    """
+    title = _readable(document_name[0]) if document_name else ""
+    party = _best_party(parties)
+    if title and party:
+        return f"the {party} {title}"
+    if title:
+        return f"the {title}"
+    return fallback

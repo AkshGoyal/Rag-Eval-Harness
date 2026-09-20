@@ -17,7 +17,8 @@ isn't in this file, that's a bug in our process.
 | D-005 | Asymmetric cross-provider models: Gemini generator, OpenAI judge | 1 | 2026-09-19 | **provisional default** — revisit at Phase 4 / Phase 8 |
 | D-006 | Stack: Python + uv, YAML + Pydantic, exact NumPy retrieval, pytest | 1 | 2026-09-19 | active |
 | D-007 | Dataset normalised on ingest, fetched over plain HTTPS, fingerprinted | 2 | 2026-09-20 | active |
-| D-008 | Questions from hand-written templates; retrieval searches all 510 contracts | 3 | 2026-09-20 | active |
+| D-008 | Questions from hand-written templates; retrieval searches all 510 contracts | 3 | 2026-09-20 | **amended** — contracts named from their own text |
+| D-009 | Character chunking and BM25 keyword retrieval, both offline | 4 | 2026-09-20 | active |
 
 Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
@@ -429,9 +430,100 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
   place: it was not something anyone predicted. (3) fails loudly at build time; names are
   disambiguated by filing year and then by ordinal, and 510 of 510 are distinct.
 
+- **Amendment, same day — contracts are named from their own text.** The first working
+  retrieval run scored **zero out of nineteen**, which is a floor effect, not weak
+  search. The cause: a name derived from the filing identifier squashes the company into
+  a single token ("lejuholdingsltd") that appears nowhere in the corpus. The only part
+  of the question capable of identifying the right contract therefore matched nothing,
+  every remaining word was generic, and search returned date-and-licence passages from
+  arbitrary documents.
+
+  Names are now built from the expert annotations instead — what the contract calls
+  itself ("Domain Name and Content License Agreement", present for all 510) and the
+  cleanest of its party names (present for 509). Both are quotations from the document,
+  so the words in the question exist in the text being searched. Recall at top-5 went
+  from 0% to 53% on the seed set, and the right contract is found for 17 of 19
+  answerable cases.
+
+  This is the risk D-003 recorded — "if every config scores near zero, the corpus or the
+  generation step needs revisiting" — arriving exactly where it was predicted to, at the
+  first end-to-end run. Had it not been checked here, every later number would have been
+  zero and the cause would have been three phases behind us.
+
+  One bug found while fixing it, worth recording because the failure was silent:
+  the name-uniqueness helper took *filing titles* and derived names from them, and it
+  was handed names that were already final. It re-derived them, producing "the The
+  Beijing Sina ..." and flattening "SINA" to "Sina". Deriving and disambiguating are now
+  separate functions.
+
 - **Still to do:** the stronger leakage test is empirical — ask the generator each
   question with no documents at all, and discard any case it answers correctly, because
   that case measures nothing. It needs the generator, so it belongs to a later phase.
+
+- **Date:** 2026-09-20
+
+---
+
+## D-009 — Chunk by characters, retrieve by keyword first
+
+- **Decision:** contracts are split into fixed-length chunks measured in **characters**,
+  cut at word boundaries, and the first retrieval method is **BM25 keyword search**
+  rather than vector search. Both run offline, with no credentials and no cost.
+
+- **Context:** Phase 4 needs a working pipeline, but embeddings need an API key that
+  this environment does not have, and the project's budget is ₹1000 in total.
+
+- **Alternatives considered:**
+  - *Chunk by tokens, using tiktoken* — tried and rejected on merit, not convenience.
+    The library installs, but downloads its vocabulary from a remote host the first time
+    it is used. That makes tokenising a **network dependency at run time**, inside a
+    project whose test suite must pass with no network and no credentials. Characters
+    need no vocabulary and behave identically everywhere. The cost is only that
+    configuration values are in characters; English prose runs about four characters to
+    a token, so the 2,000-character default is near the 512-token figure the published
+    chunking benchmarks use.
+  - *Wait for API keys and build vector search first* — rejected. It would leave the
+    pipeline untestable in CI, and it would have delayed the discovery of the naming
+    fault above until money was being spent on it.
+  - *A vector database* — already rejected in D-006, for determinism.
+
+- **Why this one:** BM25 is not a stopgap. It is the lexical half of a hybrid retrieval
+  stack, it is completely deterministic, and it gives a real baseline for vector search
+  to be compared against rather than merely something to fill the gap. It also means the
+  whole pipeline runs in continuous integration, free, on every push.
+
+- **What it produced:** 15,444 chunks from 510 contracts at the 2,000-character default,
+  a 31,859-word vocabulary, indexed in about three seconds. Recall against the seed set's
+  gold passages, varying only chunk size:
+
+  | Chunk size | Chunks | recall@1 | recall@5 | recall@10 | recall@20 |
+  |---|---|---|---|---|---|
+  | 1,000 | 30,578 | 21% | 47% | 53% | 58% |
+  | 2,000 | 15,444 | 26% | 53% | 58% | 68% |
+  | 4,000 | 7,834 | 42% | 63% | 84% | 89% |
+  | 8,000 | 4,012 | 32% | 84% | 89% | 89% |
+
+  Two things matter here. The harness is measuring something real — chunk size moves
+  recall substantially — and the movement is **not monotonic**: recall@1 peaks at 4,000
+  characters and falls at 8,000, because a larger chunk is more likely to contain the
+  answer but dilutes the keyword signal that ranks it first. That is precisely the kind
+  of finding this tool exists to surface.
+
+- **Risks / failure modes:** (1) keyword search cannot match a question that uses
+  different words from the document, which vector search is meant to fix — so a
+  configuration comparison between them may reflect that gap rather than anything about
+  chunking; (2) scoring an answer as found when a chunk only partially overlaps it
+  overstates recall; (3) an inverted index was necessary because a chunk-by-word matrix
+  would have needed roughly 3 GB at this corpus size, and a future corpus could strain
+  even the inverted form.
+
+- **How we'd detect it:** (2) is a deliberate, documented choice — any overlap counts,
+  because half a gold answer is still something worth finding — and it will be visible
+  when generation-side scores diverge from retrieval-side ones. (3) shows up as
+  index-build time growing.
+
+- **When to revisit:** when API keys are available and vector search can be added as a
+  second configuration, which is the first genuinely interesting A/B this project can run.
 
 - **Date:** 2026-09-20
 

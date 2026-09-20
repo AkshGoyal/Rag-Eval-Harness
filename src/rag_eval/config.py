@@ -13,9 +13,9 @@ that matter more than they might appear:
 * enumerated fields - an invalid strategy or provider is unrepresentable rather
   than discovered halfway through a run.
 
-Enumerations list only what is implemented. ``bm25`` and ``hybrid`` retrieval are
-planned (see docs/ROADMAP.md) and are deliberately absent until they work: a
-configuration file should not offer a setting that fails.
+Enumerations list only what is implemented. ``hybrid`` retrieval is planned (see
+docs/ROADMAP.md) and deliberately absent until it works: a configuration file should
+not offer a setting that fails.
 """
 
 from __future__ import annotations
@@ -41,13 +41,22 @@ class _Section(BaseModel):
 class ChunkStrategy(StrEnum):
     """How documents are split before embedding."""
 
-    FIXED_TOKEN = "fixed_token"
+    FIXED_CHAR = "fixed_char"
+    """Fixed-length pieces measured in characters, cut at word boundaries.
+
+    Characters rather than tokens because tokenising needs either a runtime download
+    or a heavy dependency, and this suite runs with no network. English prose is
+    roughly four characters to a token, so 2,000 characters is about 500 tokens."""
 
 
 class RetrievalMethod(StrEnum):
     """How candidate chunks are found for a question."""
 
+    BM25 = "bm25"
+    """Keyword search. Needs no model, so it runs offline and free."""
+
     DENSE = "dense"
+    """Vector search over embeddings. Not implemented yet."""
 
 
 class Provider(StrEnum):
@@ -72,8 +81,8 @@ class ChunkingConfig(_Section):
     """How documents are split into retrievable units."""
 
     strategy: ChunkStrategy
-    size: int = Field(ge=1, description="Chunk length in tokens.")
-    overlap: int = Field(ge=0, description="Tokens shared between adjacent chunks.")
+    size: int = Field(ge=1, description="Chunk length in characters.")
+    overlap: int = Field(ge=0, description="Characters shared between adjacent chunks.")
 
     @model_validator(mode="after")
     def _overlap_must_be_smaller_than_size(self) -> ChunkingConfig:

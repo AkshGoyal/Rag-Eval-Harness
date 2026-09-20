@@ -10,16 +10,16 @@ corpus:
   hash: null                      # filled by ingestion (Phase 2)
 
 chunking:
-  strategy: fixed_token
-  size: 512                       # benchmark-validated default; revisited in Phase 4
-  overlap: 64
+  strategy: fixed_char
+  size: 2000                      # characters; about 500 tokens, the benchmark default
+  overlap: 250
 
 embedding:
   provider: openai
   model: text-embedding-3-small   # D-005
 
 retrieval:
-  method: dense
+  method: bm25
   top_k: 5
 
 generation:

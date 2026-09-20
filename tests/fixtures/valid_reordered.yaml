@@ -18,7 +18,7 @@ embedding:
 chunking:
   overlap: 64
   size: 512
-  strategy: fixed_token
+  strategy: fixed_char
 corpus:
   hash: null
   version: v1
