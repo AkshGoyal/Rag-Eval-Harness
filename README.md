@@ -13,22 +13,49 @@ generator misused good context.
 
 ## Status
 
-**Phase 1 of 14 — early.** The configuration model and its tooling exist; the
-pipeline, metrics, judge and reports do not yet. See
-[`docs/ROADMAP.md`](docs/ROADMAP.md) for the plan and
+**Phase 5 of 14.** The corpus, the test set, chunking and keyword retrieval all work
+and need no credentials. Vector search, answer generation and judging are next, and
+those need an API key. See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the plan and
 [`docs/DECISIONS.md`](docs/DECISIONS.md) for why each choice was made.
 
-## Running the checks
+## Getting started
 
-Requires [uv](https://docs.astral.sh/uv/). **No API keys are needed** — the suite
-runs without credentials, and CI enforces that.
+Requires [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync --dev
-uv run ruff check .
-uv run mypy
-uv run pytest
+uv run pytest            # 119 tests, no API key needed — CI enforces that
 ```
+
+Then build the corpus and the test set. Both are reproducible: the same inputs always
+produce the same fingerprints, which are printed so you can check.
+
+```bash
+uv run python -m rag_eval ingest         # downloads CUAD, ~18 MB, a few seconds
+uv run python -m rag_eval verify         # proves nothing has changed since
+uv run python -m rag_eval build-testset  # selects 30 cases from 20,910 candidates
+```
+
+Nothing above costs anything or needs a key.
+
+## Using models
+
+One key covers everything, through [OpenRouter](https://openrouter.ai/keys).
+
+```bash
+cp .env.example .env     # then paste your key after OPENROUTER_API_KEY=
+```
+
+`.env` is git-ignored and cannot be committed.
+
+```bash
+uv run python -m rag_eval models --search llama    # real prices, read from the gateway
+uv run python -m rag_eval check-models             # two tiny calls; costs a fraction of a rupee
+```
+
+`check-models` proves the whole path works — key, models, provider pinning, cost
+accounting — before anything is built on top of it. Run it twice: the second time both
+calls come from the cache and cost nothing.
 
 ## Documentation
 

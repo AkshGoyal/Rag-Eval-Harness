@@ -2,9 +2,10 @@
 
 **Current phase:** Phase 5 — Run harness core (model wrapper done; manifest and logs next)
 **Last updated:** 2026-09-19
-**Next action:** Aksh adds credit to OpenRouter, creates a key, and puts it in a local
-`.env`. Then dense embeddings and a vector index, then retrieval metrics — at which
-point keyword search and vector search can be compared honestly, which is Milestone A.
+**Next action:** Aksh runs `check-models` on his machine to prove the key works, and
+`models` to read the real prices. Then dense embeddings and a vector index, then
+retrieval metrics — at which point keyword search and vector search can be compared
+honestly, which is Milestone A.
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.

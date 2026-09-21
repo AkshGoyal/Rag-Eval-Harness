@@ -37,6 +37,10 @@ class FakeTransport:
         self.responses = responses or [(200, _chat_body())]
         self.requests: list[JSONValue] = []
         self.calls = 0
+        self.catalog: JSONValue = {"data": []}
+
+    def get(self, url: str, headers: Mapping[str, str], timeout: float) -> tuple[int, JSONValue]:
+        return 200, self.catalog
 
     def post(
         self, url: str, headers: Mapping[str, str], payload: JSONValue, timeout: float
@@ -55,6 +59,9 @@ class ExplodingTransport:
 
     def __init__(self) -> None:
         self.calls = 0
+
+    def get(self, url: str, headers: Mapping[str, str], timeout: float) -> tuple[int, JSONValue]:
+        raise TransportError("no route to host")
 
     def post(
         self, url: str, headers: Mapping[str, str], payload: JSONValue, timeout: float
@@ -344,3 +351,66 @@ def test_a_missing_key_fails_only_when_a_call_is_made(
 
     with pytest.raises(ModelError, match="no API key"):
         client.chat(_request())
+
+
+# --- the model catalogue ------------------------------------------------------
+
+
+def test_catalogue_prices_are_converted_to_per_million(tmp_path: Path) -> None:
+    """The gateway quotes dollars per token; everything else in this project is per million."""
+    from rag_eval.llm.catalog import fetch_catalog, prices_from
+
+    transport = FakeTransport()
+    transport.catalog = {
+        "data": [
+            {
+                "id": "vendor/small",
+                "name": "Small",
+                "context_length": 8192,
+                "pricing": {"prompt": "0.00000002", "completion": "0.00000005"},
+            }
+        ]
+    }
+
+    catalog = fetch_catalog(transport, base_url="https://example.test/api/v1")
+
+    assert catalog[0].model_id == "vendor/small"
+    assert catalog[0].price.input_per_million == pytest.approx(0.02)
+    assert catalog[0].price.output_per_million == pytest.approx(0.05)
+    assert prices_from(catalog)["vendor/small"].input_per_million == pytest.approx(0.02)
+
+
+def test_free_models_are_identified() -> None:
+    from rag_eval.llm.catalog import fetch_catalog
+
+    transport = FakeTransport()
+    transport.catalog = {
+        "data": [{"id": "vendor/free", "pricing": {"prompt": "0", "completion": "0"}}]
+    }
+
+    assert fetch_catalog(transport, base_url="https://example.test/api/v1")[0].is_free
+
+
+def test_a_malformed_catalogue_entry_is_skipped_not_fatal() -> None:
+    """One odd row should not make the whole catalogue unreadable."""
+    from rag_eval.llm.catalog import fetch_catalog
+
+    transport = FakeTransport()
+    transport.catalog = {
+        "data": [
+            "not an object",
+            {"no_id": True},
+            {"id": "vendor/ok", "pricing": {"prompt": "0.000001"}},
+        ]
+    }
+
+    catalog = fetch_catalog(transport, base_url="https://example.test/api/v1")
+
+    assert [model.model_id for model in catalog] == ["vendor/ok"]
+
+
+def test_an_unreachable_gateway_is_reported_clearly() -> None:
+    from rag_eval.llm.catalog import CatalogError, fetch_catalog
+
+    with pytest.raises(CatalogError, match="no route to host"):
+        fetch_catalog(ExplodingTransport(), base_url="https://example.test/api/v1")

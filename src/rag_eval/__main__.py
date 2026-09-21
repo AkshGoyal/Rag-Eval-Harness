@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 from rag_eval.dataset.ingest import ingest_cuad
 from rag_eval.dataset.loader import load_dataset
 from rag_eval.errors import RagEvalError
+from rag_eval.llm.catalog import fetch_catalog
+from rag_eval.llm.client import API_KEY_VARIABLE, OPENROUTER_BASE_URL
+from rag_eval.llm.smoke import run_smoke_test
+from rag_eval.llm.transport import HttpTransport
 from rag_eval.testset.build import build_testset, write_testset
 from rag_eval.testset.templates import load_templates
 
@@ -35,7 +40,36 @@ def build_parser() -> argparse.ArgumentParser:
     testset.add_argument("--out", type=Path, default=Path("testset"))
     testset.add_argument("--name", default="seed-v1")
 
+    models = commands.add_parser("models", help="list models the gateway offers, with prices")
+    models.add_argument("--search", default="", help="only show models whose id contains this")
+    models.add_argument("--free", action="store_true", help="only show models that cost nothing")
+    models.add_argument("--limit", type=int, default=40)
+
+    smoke = commands.add_parser("check-models", help="make two tiny calls to prove the setup works")
+    smoke.add_argument("--chat-model", default="meta-llama/llama-3.1-8b-instruct")
+    smoke.add_argument("--embedding-model", default="openai/text-embedding-3-small")
+    smoke.add_argument("--provider", default=None, help="pin to one upstream provider")
+    smoke.add_argument("--cache", type=Path, default=Path(".cache/llm"))
+
     return parser
+
+
+def _api_key() -> str | None:
+    """Read the gateway key from the environment, or from a local .env file.
+
+    Read at call time rather than at import, so that importing this package on a
+    machine with no credentials still works.
+    """
+    key = os.environ.get(API_KEY_VARIABLE)
+    if key:
+        return key
+    env_file = Path(".env")
+    if env_file.is_file():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            name, _, value = line.partition("=")
+            if name.strip() == API_KEY_VARIABLE and value.strip():
+                return value.strip().strip("\"'")
+    return None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -53,6 +87,53 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(f"  categories   {manifest.category_count}")
             print(f"  fingerprint  {manifest.content_hash}")
+        elif args.command == "models":
+            catalog = fetch_catalog(
+                HttpTransport(), base_url=OPENROUTER_BASE_URL, api_key=_api_key()
+            )
+            shown = [
+                model
+                for model in catalog
+                if args.search.lower() in model.model_id.lower()
+                and (not args.free or model.is_free)
+            ]
+            shown.sort(key=lambda model: (model.price.input_per_million, model.model_id))
+            print(f"{len(shown)} of {len(catalog)} models match\n")
+            print(f"{'model':<52} {'$/M in':>9} {'$/M out':>9} {'context':>9}")
+            for model in shown[: args.limit]:
+                print(
+                    f"{model.model_id:<52} {model.price.input_per_million:>9.4f} "
+                    f"{model.price.output_per_million:>9.4f} {model.context_length:>9,}"
+                )
+            if len(shown) > args.limit:
+                print(f"\n... and {len(shown) - args.limit} more; narrow with --search")
+
+        elif args.command == "check-models":
+            result = run_smoke_test(
+                HttpTransport(),
+                base_url=OPENROUTER_BASE_URL,
+                chat_model=args.chat_model,
+                embedding_model=args.embedding_model,
+                cache_dir=args.cache,
+                api_key=_api_key(),
+                provider=args.provider,
+            )
+            print("Chat")
+            print(f"  model      {result.chat_record.model}")
+            print(f"  served by  {result.chat_record.provider_served or 'not reported'}")
+            print(f"  answer     {result.chat_text}")
+            print(f"  tokens     {result.chat_record.usage}")
+            print(f"  cost       ${result.chat_record.cost_usd:.6f}")
+            print(f"  truncated  {result.chat_record.truncated}")
+            print(f"  attempts   {result.chat_record.attempts}")
+            print("\nEmbedding")
+            print(f"  model      {result.embedding_record.model}")
+            print(f"  served by  {result.embedding_record.provider_served or 'not reported'}")
+            print(f"  dimensions {result.embedding_dimensions}")
+            print(f"  cost       ${result.embedding_record.cost_usd:.6f}")
+            print(f"\nTotal cost of this check: ${result.total_cost_usd:.6f}")
+            print("Run it again and both calls should come from the cache, costing nothing.")
+
         elif args.command == "build-testset":
             dataset = load_dataset(args.dataset, verify_files=False)
             templates = load_templates(args.templates)

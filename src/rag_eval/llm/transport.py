@@ -21,7 +21,11 @@ class TransportError(Exception):
 
 
 class Transport(Protocol):
-    """Performs one HTTP POST and returns the status and decoded body."""
+    """Performs one HTTP request and returns the status and decoded body."""
+
+    def get(self, url: str, headers: Mapping[str, str], timeout: float) -> tuple[int, JSONValue]:
+        """Fetch ``url`` and return ``(status_code, decoded_body)``."""
+        ...
 
     def post(
         self,
@@ -36,6 +40,10 @@ class Transport(Protocol):
 
 class HttpTransport:
     """The real transport, over the standard library."""
+
+    def get(self, url: str, headers: Mapping[str, str], timeout: float) -> tuple[int, JSONValue]:
+        """Fetch ``url`` and return ``(status_code, decoded_body)``."""
+        return self._send(urllib.request.Request(url, headers=dict(headers), method="GET"), timeout)
 
     def post(
         self,
@@ -57,6 +65,11 @@ class HttpTransport:
             headers={"Content-Type": "application/json", **dict(headers)},
             method="POST",
         )
+        return self._send(request, timeout)
+
+    def _send(self, request: urllib.request.Request, timeout: float) -> tuple[int, JSONValue]:
+        """Send a prepared request, returning error statuses rather than raising them."""
+        url = request.full_url
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 body: JSONValue = json.loads(response.read().decode("utf-8"))
