@@ -97,7 +97,8 @@ enforced to stay that way.
 
 ## Try it
 
-Requires [uv](https://docs.astral.sh/uv/).
+Requires [uv](https://docs.astral.sh/uv/). In GitHub Codespaces the devcontainer
+installs it and syncs dependencies for you, so you can skip straight to `uv run pytest`.
 
 ```bash
 uv sync --dev
@@ -107,7 +108,10 @@ uv run python -m rag_eval verify         # prove it hasn't changed since
 uv run python -m rag_eval build-testset  # select 30 cases from 20,910 candidates
 ```
 
-To use models, one [OpenRouter](https://openrouter.ai/keys) key covers everything:
+To use models, one [OpenRouter](https://openrouter.ai/keys) key covers everything. In
+Codespaces, add it as a Codespace secret named `OPENROUTER_API_KEY` rather than writing
+a file — it is then present as an environment variable and never touches the disk.
+Elsewhere:
 
 ```bash
 cp .env.example .env                        # paste your key; .env is git-ignored
