@@ -21,6 +21,7 @@ until its failure modes are listed here.
 | Two runs you expect to match produce different fingerprints | [Hashing — fingerprint changed unexpectedly](#hashing--fingerprint-changed-unexpectedly) |
 | Tests pass locally but fail in CI | [Tooling — CI has no credentials](#tooling--ci-has-no-credentials) |
 | Scores moved and you did not change the configuration | [Dataset — documents changed underneath you](#dataset--documents-changed-underneath-you) |
+| On Windows, `verify` says every contract "has changed since ingestion" | [Dataset — line endings rewritten on disk](#dataset--line-endings-rewritten-on-disk) |
 | `ingest` stops saying the fingerprint does not match | [Dataset — the upstream archive changed](#dataset--the-upstream-archive-changed) |
 | `ingest` stops naming contracts and categories | [Dataset — the source failed validation](#dataset--the-source-failed-validation) |
 | Every configuration scores the same on some category | [Test set — questions that answer themselves](#test-set--questions-that-answer-themselves) |
@@ -262,6 +263,25 @@ until its failure modes are listed here.
 - **Fix / recover:** raise `max_output_tokens` in the configuration and rerun. That
   changes the cache key, so the affected calls are genuinely remade rather than reused.
 - **Prevented or caught by:** `tests/test_llm.py::test_a_truncated_answer_is_recorded_as_truncated`.
+
+---
+
+### Dataset — line endings rewritten on disk
+
+- **What fails:** a contract's text is written or read in text mode, and the operating
+  system rewrites its line endings on the way.
+- **Symptom:** on Windows, every contract fails verification immediately after a clean
+  ingestion. The tamper check is working correctly; the writer changed the bytes. On any
+  platform, a corpus containing carriage returns would come back subtly different, with
+  every answer offset after the first affected line shifted.
+- **Look first:** whether the file was written with `write_text` or opened in `"w"` mode.
+  Contract text must be written as bytes, and read back from bytes, so that the bytes
+  fingerprinted, written and read are the same bytes.
+- **Fix / recover:** re-run `ingest` after the fix. Nothing downstream is affected,
+  because the corpus fingerprint is computed from the in-memory text, not the file.
+- **Prevented or caught by:** `tests/test_dataset.py::test_contract_text_survives_the_disk_byte_for_byte`,
+  which catches the read side anywhere, and the Windows job in CI, which is the only
+  thing that can catch the write side. Found on the first run on a Windows laptop.
 
 ---
 

@@ -234,3 +234,66 @@ def test_source_fingerprint_mismatch_stops_ingestion(tmp_path: Path) -> None:
         )
 
     assert any("recorded fingerprint" in problem for problem in caught.value.problems)
+
+
+def test_contract_text_survives_the_disk_byte_for_byte(tmp_path: Path) -> None:
+    """What is fingerprinted, what is written and what is read back must be the same bytes.
+
+    Text-mode file I/O rewrites line endings: Windows turns every newline into a
+    carriage return plus newline when writing, and every platform folds carriage
+    returns back into newlines when reading. Either one silently changes a contract's
+    text, which makes verification report tampering that never happened and shifts
+    every answer offset after the first changed line.
+    """
+    text = "Clause 1.\r\nGoverned by the laws of Delaware.\rStray return.\nCafé terms.\n"
+    answer = "the laws of Delaware"
+    document = {
+        "version": "crlf",
+        "data": [
+            {
+                "title": "GAMMA_INC-EX-1-LICENSE AGREEMENT",
+                "paragraphs": [
+                    {
+                        "context": text,
+                        "qas": [
+                            {
+                                "id": "GAMMA_INC-EX-1-LICENSE AGREEMENT__Governing Law",
+                                "question": "q",
+                                "answers": [{"text": answer, "answer_start": text.index(answer)}],
+                                "is_impossible": False,
+                            },
+                            {
+                                "id": "GAMMA_INC-EX-1-LICENSE AGREEMENT__Document Name",
+                                "question": "q",
+                                "answers": [],
+                                "is_impossible": True,
+                            },
+                            {
+                                "id": "GAMMA_INC-EX-1-LICENSE AGREEMENT__Cap On Liability",
+                                "question": "q",
+                                "answers": [],
+                                "is_impossible": True,
+                            },
+                            {
+                                "id": "GAMMA_INC-EX-1-LICENSE AGREEMENT__Source Code Escrow",
+                                "question": "q",
+                                "answers": [],
+                                "is_impossible": True,
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    source = tmp_path / "crlf.json"
+    source.write_text(json.dumps(document), encoding="utf-8")
+
+    _ingest(tmp_path / "out", json_path=source)
+    dataset = load_dataset(tmp_path / "out")
+
+    contract_id = dataset.contracts[0].contract_id
+    assert dataset.text(contract_id) == text
+    label = next(label for label in dataset.labels if label.present)
+    span = label.spans[0]
+    assert dataset.text(contract_id)[span.start : span.end] == answer

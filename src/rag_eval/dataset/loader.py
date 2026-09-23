@@ -42,7 +42,10 @@ class Dataset:
         path = self.root / "contracts" / f"{contract_id}.txt"
         if not path.is_file():
             raise DatasetError(str(self.root), [f"no contract named {contract_id!r}"])
-        return path.read_text(encoding="utf-8")
+        # Decoded from bytes rather than read as text: text mode folds carriage
+        # returns into newlines on every platform, which would change the contract
+        # and shift every answer offset after the first affected line.
+        return path.read_bytes().decode("utf-8")
 
 
 def load_dataset(root: Path, *, verify_files: bool = True) -> Dataset:

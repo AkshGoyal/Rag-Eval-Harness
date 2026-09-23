@@ -245,9 +245,11 @@ def _cases_hash(cases: tuple[TestCase, ...]) -> str:
 def write_testset(out_dir: Path, cases: tuple[TestCase, ...], manifest: TestSetManifest) -> None:
     """Write the cases and their manifest side by side."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    with (out_dir / f"{manifest.name}.jsonl").open("w", encoding="utf-8") as handle:
+    with (out_dir / f"{manifest.name}.jsonl").open("w", encoding="utf-8", newline="\n") as handle:
         for case in cases:
             handle.write(json.dumps(case.model_dump(mode="json"), sort_keys=True) + "\n")
     (out_dir / f"{manifest.name}.manifest.json").write_text(
-        json.dumps(manifest.model_dump(mode="json"), indent=2) + "\n", encoding="utf-8"
+        json.dumps(manifest.model_dump(mode="json"), indent=2) + "\n",
+        encoding="utf-8",
+        newline="\n",
     )

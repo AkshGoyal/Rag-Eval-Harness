@@ -171,8 +171,12 @@ def _write(
     contracts_dir = out_dir / "contracts"
     contracts_dir.mkdir(parents=True, exist_ok=True)
 
+    # Written as bytes, not text. Text mode on Windows turns every newline into a
+    # carriage return plus newline, so the file would no longer match the fingerprint
+    # taken from this same string a moment earlier, and verification would report
+    # tampering that never happened. These are exactly the bytes that were hashed.
     for contract_id, _, text in contracts:
-        (contracts_dir / f"{contract_id}.txt").write_text(text, encoding="utf-8")
+        (contracts_dir / f"{contract_id}.txt").write_bytes(text.encode("utf-8"))
 
     _write_lines(
         out_dir / "contracts.jsonl",
@@ -193,15 +197,17 @@ def _write(
         )
         + "\n",
         encoding="utf-8",
+        newline="\n",
     )
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest.model_dump(mode="json"), indent=2, ensure_ascii=True) + "\n",
         encoding="utf-8",
+        newline="\n",
     )
 
 
 def _write_lines(path: Path, rows: list[dict[str, object]]) -> None:
     """Write one compact JSON object per line."""
-    with path.open("w", encoding="utf-8") as handle:
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
         for row in rows:
             handle.write(json.dumps(row, sort_keys=True, ensure_ascii=True) + "\n")

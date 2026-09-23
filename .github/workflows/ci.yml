@@ -9,13 +9,21 @@ on:
 # must pass without credentials; if a module starts reading an API key at import
 # time, this workflow is what catches it.
 #
-# A single Python version by design: Actions minutes are metered on private
-# repositories (see D-001), and a matrix would multiply that for little return
-# while the project is small.
+# Linux and Windows, one Python version. Windows is here because it is where this
+# project is developed, and one class of bug exists only there: text-mode file
+# writes turn every newline into a carriage return plus newline, which once made
+# every freshly ingested contract fail its own fingerprint check. Linux cannot
+# reproduce that, so only a Windows run can guard against it. Windows minutes are
+# billed at twice the Linux rate on private repositories (D-001); for a suite that
+# runs in seconds, that is worth paying.
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
