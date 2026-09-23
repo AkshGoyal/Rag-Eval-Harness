@@ -1,6 +1,8 @@
+from pathlib import Path
+
 import pytest
 
-from rag_eval.config import Provider, RetrievalMethod, load_config
+from rag_eval.config import RetrievalMethod, load_config
 from rag_eval.errors import ConfigError
 
 from .conftest import FIXTURES
@@ -14,8 +16,9 @@ def test_valid_config_loads_with_expected_values() -> None:
     assert config.chunking.overlap == 64
     assert config.retrieval.top_k == 5
     assert config.retrieval.method is RetrievalMethod.DENSE
-    assert config.generation.provider is Provider.GOOGLE
-    assert config.judge.provider is Provider.OPENAI
+    assert config.embedding.model == "openai/text-embedding-3-small"
+    assert config.embedding.provider is None
+    assert config.generation.model == "meta-llama/llama-3.1-8b-instruct"
     assert config.corpus.hash is None
 
 
@@ -103,3 +106,52 @@ def test_error_message_reports_every_problem_at_once() -> None:
         load_config(FIXTURES / "unknown_field.yaml")
 
     assert len(caught.value.problems) >= 2
+
+
+@pytest.mark.parametrize(
+    "alias",
+    ["~deepseek/deepseek-v4-flash-latest", "deepseek/deepseek-flash-latest", "vendor/model:latest"],
+)
+def test_an_alias_model_id_is_rejected(tmp_path: Path, alias: str) -> None:
+    """An alias can be re-pointed by the gateway, so identical configs could call two models."""
+    text = (
+        (FIXTURES / "valid.yaml")
+        .read_text()
+        .replace("model: deepseek/deepseek-v4-flash", f"model: {alias}")
+    )
+    path = tmp_path / "alias.yaml"
+    path.write_text(text)
+
+    with pytest.raises(ConfigError, match="alias"):
+        load_config(path)
+
+
+def test_a_model_id_without_a_vendor_is_rejected(tmp_path: Path) -> None:
+    text = (
+        (FIXTURES / "valid.yaml")
+        .read_text()
+        .replace("model: openai/text-embedding-3-small", "model: text-embedding-3-small")
+    )
+    path = tmp_path / "bare.yaml"
+    path.write_text(text)
+
+    with pytest.raises(ConfigError, match="vendor/model"):
+        load_config(path)
+
+
+@pytest.mark.parametrize("name", ["baseline.yaml", "dense-openai-small.yaml", "dense-qwen-8b.yaml"])
+def test_the_shipped_configs_load(name: str) -> None:
+    load_config(Path("configs") / name)
+
+
+def test_the_dense_configs_differ_from_the_baseline_only_where_intended() -> None:
+    """A comparison is only attributable if nothing else changed."""
+    baseline = load_config(Path("configs/baseline.yaml")).model_dump()
+    openai_small = load_config(Path("configs/dense-openai-small.yaml")).model_dump()
+    qwen = load_config(Path("configs/dense-qwen-8b.yaml")).model_dump()
+
+    def changed(a: dict[str, object], b: dict[str, object]) -> set[str]:
+        return {key for key in a if a[key] != b[key]} - {"name"}
+
+    assert changed(baseline, openai_small) == {"retrieval"}
+    assert changed(openai_small, qwen) == {"embedding"}

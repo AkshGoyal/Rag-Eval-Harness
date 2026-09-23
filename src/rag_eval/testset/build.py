@@ -243,12 +243,31 @@ def _cases_hash(cases: tuple[TestCase, ...]) -> str:
 
 
 def write_testset(out_dir: Path, cases: tuple[TestCase, ...], manifest: TestSetManifest) -> None:
-    """Write the cases and their manifest side by side."""
+    """Write the cases and their manifest side by side.
+
+    If a manifest already exists for exactly the same cases, its timestamp is kept, so
+    rebuilding an unchanged test set leaves both files byte-for-byte as they were. The
+    set is committed to the repository, and a rewrite that changed nothing but a
+    timestamp would show as a local modification and block the next pull.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = out_dir / f"{manifest.name}.manifest.json"
+    if manifest_path.is_file():
+        try:
+            existing = TestSetManifest.model_validate_json(
+                manifest_path.read_text(encoding="utf-8")
+            )
+        except ValueError:
+            existing = None
+        if existing is not None and existing.model_dump(exclude={"created_at"}) == (
+            manifest.model_dump(exclude={"created_at"})
+        ):
+            manifest = manifest.model_copy(update={"created_at": existing.created_at})
+
     with (out_dir / f"{manifest.name}.jsonl").open("w", encoding="utf-8", newline="\n") as handle:
         for case in cases:
             handle.write(json.dumps(case.model_dump(mode="json"), sort_keys=True) + "\n")
-    (out_dir / f"{manifest.name}.manifest.json").write_text(
+    manifest_path.write_text(
         json.dumps(manifest.model_dump(mode="json"), indent=2) + "\n",
         encoding="utf-8",
         newline="\n",

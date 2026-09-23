@@ -31,6 +31,9 @@ an A/B comparison is two of these files differing in one field.
 | Test set builder | Selecting cases reproducibly from a corpus | Knowing how the corpus was loaded — it takes a protocol | `src/rag_eval/testset/build.py` |
 | Chunking | Splitting contracts into retrievable pieces at word boundaries | Deciding how big a chunk should be — that is configuration | `src/rag_eval/pipeline/chunking.py` |
 | BM25 index | Ranking chunks by keyword match, exactly and deterministically | Understanding meaning — it matches words, not ideas | `src/rag_eval/retrieval/bm25.py` |
+| Dense index | Embedding chunks once, saving them under a content key, exact cosine search | Choosing the model — that is configuration | `src/rag_eval/retrieval/dense.py` |
+| Retrieval metrics | hit@k, span recall@k and MRR per case type, with errors and unscored cases counted | Anything about generated answers | `src/rag_eval/metrics/retrieval.py` |
+| `retrieve` command | Running one configuration's retrieval against the test set and printing the report | Comparing two runs — that comes next | `src/rag_eval/retrieval_run.py` |
 | Model client | Every call to every model: caching, retries, spend limit, provider pinning | Knowing what a prompt means — it moves requests, not intent | `src/rag_eval/llm/client.py` |
 | Response cache | Storing raw provider responses against a content key | Deciding what belongs in the key — the request models do that | `src/rag_eval/llm/cache.py` |
 | Budget guard | Stopping a run before it exceeds its spending limit | Estimating cost in advance | `src/rag_eval/llm/budget.py` |
@@ -186,6 +189,10 @@ src/rag_eval/
   retrieval/
     base.py     what every retriever provides
     bm25.py     keyword search over an inverted index
+    dense.py    vector search, saved under a content key
+  metrics/
+    retrieval.py  hit@k, span recall@k, MRR
+  retrieval_run.py  the `retrieve` command
   llm/
     types.py    what a model call is, and what it produced
     cache.py    content-addressed response cache

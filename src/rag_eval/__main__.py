@@ -15,6 +15,7 @@ from rag_eval.llm.catalog import fetch_catalog, fetch_embedding_catalog
 from rag_eval.llm.client import API_KEY_VARIABLE, OPENROUTER_BASE_URL
 from rag_eval.llm.smoke import run_smoke_test
 from rag_eval.llm.transport import HttpTransport
+from rag_eval.retrieval_run import run_retrieval
 from rag_eval.testset.build import build_testset, write_testset
 from rag_eval.testset.templates import load_templates
 
@@ -45,6 +46,25 @@ def build_parser() -> argparse.ArgumentParser:
     models.add_argument("--search", default="", help="only show models whose id contains this")
     models.add_argument("--free", action="store_true", help="only show models that cost nothing")
     models.add_argument("--limit", type=int, default=40)
+
+    retrieve = commands.add_parser(
+        "retrieve", help="score a configuration's retrieval against the test set"
+    )
+    retrieve.add_argument("--config", type=Path, required=True)
+    retrieve.add_argument("--dataset", type=Path, default=Path("data/cuad/v1"))
+    retrieve.add_argument("--testset", type=Path, default=Path("testset/seed-v1.jsonl"))
+    retrieve.add_argument("--indexes", type=Path, default=Path("data/indexes"))
+    retrieve.add_argument("--cache", type=Path, default=Path(".cache/llm"))
+    retrieve.add_argument(
+        "--limit-usd",
+        type=float,
+        default=0.50,
+        help="hard spending limit for this run (default $0.50; a full index is about $0.15)",
+    )
+    retrieve.add_argument(
+        "--dry-run", action="store_true", help="estimate the cost and stop before spending"
+    )
+    retrieve.add_argument("--cases", action="store_true", help="also list every case")
 
     smoke = commands.add_parser("check-models", help="make two tiny calls to prove the setup works")
     smoke.add_argument("--chat-model", default="meta-llama/llama-3.1-8b-instruct")
@@ -168,6 +188,19 @@ def main(argv: list[str] | None = None) -> int:
                 )
             if not args.fresh:
                 print("Run again: both calls should say 'from cache: yes' and cost nothing.")
+
+        elif args.command == "retrieve":
+            return run_retrieval(
+                config_path=args.config,
+                dataset_path=args.dataset,
+                testset_path=args.testset,
+                index_root=args.indexes,
+                cache_dir=args.cache,
+                limit_usd=args.limit_usd,
+                dry_run=args.dry_run,
+                show_cases=args.cases,
+                api_key=_api_key(),
+            )
 
         elif args.command == "build-testset":
             dataset = load_dataset(args.dataset, verify_files=False)

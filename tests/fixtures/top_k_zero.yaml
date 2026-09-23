@@ -8,19 +8,16 @@ chunking:
   size: 512
   overlap: 64
 embedding:
-  provider: openai
-  model: text-embedding-3-small
+  model: openai/text-embedding-3-small
 retrieval:
   method: dense
   top_k: 0
 generation:
-  provider: google
-  model: placeholder-flash-lite
+  model: meta-llama/llama-3.1-8b-instruct
   prompt: prompts/generate/v1.md
   temperature: 0.0
   max_output_tokens: 512
 judge:
-  provider: openai
-  model: gpt-4o-mini
+  model: deepseek/deepseek-v4-flash
   rubric: prompts/judge/v1.md
   max_output_tokens: 512

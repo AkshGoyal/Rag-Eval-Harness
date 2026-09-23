@@ -20,6 +20,7 @@ isn't in this file, that's a bug in our process.
 | D-008 | Questions from hand-written templates; retrieval searches all 510 contracts | 3 | 2026-09-20 | **amended** — contracts named from their own text |
 | D-009 | Character chunking and BM25 keyword retrieval, both offline | 4 | 2026-09-20 | active |
 | D-010 | One gateway (OpenRouter), pinned providers, everything through one wrapper | 5 | 2026-09-20 | **amended** 2026-09-23 — real prices, aliases, unpriced models |
+| D-011 | Vector search: exact, saved by content key, scored three ways | 4/6 | 2026-09-23 | active |
 
 Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
@@ -645,6 +646,75 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
   embedding model, as soon as there are two to compare.
 
 - **Date:** 2026-09-20
+
+---
+
+## D-011 — Vector search: exact, saved under a content key, scored three ways
+
+- **Decision:** vector search embeds every chunk once through the model client, saves
+  the vectors to disk under a key derived from the corpus fingerprint, the chunking
+  configuration and the embedding model, and searches them exactly. Retrieval is scored
+  with three deterministic measures — hit@k, span recall@k and MRR — per case type, by
+  a `retrieve` command that works identically for keyword and vector search.
+
+- **Context:** the first comparison worth running is keyword search against vector
+  search. Embedding the corpus is the only step in the project that costs real money at
+  scale, and the development environment cannot reach the gateway, so the build has to
+  be correct before anyone pays for it.
+
+- **The choices inside it, one line each:**
+  - *Exact search, not an approximate index* — as D-006: an index that varies between
+    builds would make a score difference unattributable. At 15,444 chunks it is one
+    matrix multiplication.
+  - *Saved under a content key* — the same corpus, chunking and model always find the
+    same saved index; changing any of them builds a new one rather than silently reusing
+    a stale one. Batch size is deliberately excluded: it changes how requests are
+    grouped, not what comes back.
+  - *Vectors requested as base64* — about a third of the size of a JSON list of
+    decimals, which matters because the response cache holds every batch. Measured: 122
+    MB of cache and 92 MB of index per configuration. The parser still accepts plain
+    lists, so a provider that ignores the request cannot break a build.
+  - *A cost estimate before every build, and a dry-run mode* — the brief asked for both.
+    A build whose estimate exceeds the spending limit refuses to start.
+  - *Resumable builds* — every batch goes through the client and is cached as it
+    completes, so a build interrupted by a lost connection or the spending limit resumes
+    without paying twice.
+  - *The second embedding model is Qwen3 Embedding 8B*, not BGE-M3 as first proposed.
+    The live catalogue lists it at half the price of OpenAI's small model with four
+    times the context; BGE-M3's price was never confirmed against the gateway.
+
+- **Why three measures:** "recall" gets used loosely. hit@k asks whether any part of the
+  answer was in the top k; span recall@k asks what share of a split answer was, which is
+  the honest measure for multi-hop questions; MRR rewards putting the answer first.
+  Refusal cases have no passage to find, so they are counted and reported rather than
+  scored — a score over nineteen cases must never read as a score over thirty. A case
+  that fails is recorded with its reason and scores zero, so failures cannot inflate the
+  average by dropping out of it. Reaching the spending limit is the one failure that is
+  not recorded per case: it stops the run, because recording it per case would turn
+  "stopped at the limit" into "every remaining case errored".
+
+- **How it was verified before any money was spent:** the `retrieve` command reproduced,
+  for keyword search, the numbers measured by hand in Phase 4 — hit@1 26%, hit@5 53%,
+  hit@10 58% — so two independent calculations agree. Vector search was rehearsed on
+  the full corpus through a fake gateway producing real-sized 1,536-dimension vectors:
+  155 batches built in 14 seconds, the second run reused the index with no requests,
+  and peak memory was 427 MB. What that could not test is the real gateway's handling
+  of base64, which the setup check exercises on a single call before the full build.
+
+- **Risks / failure modes:** (1) the character-based estimate can be off by perhaps a
+  fifth against real token counts; (2) a saved index can be deleted or edited by hand;
+  (3) a query embedded by a different model than the index would compare vectors that
+  mean nothing to each other.
+
+- **How we'd detect it:** (1) the build prints the real cost next to the estimate; (2)
+  loading refuses an index whose chunk list does not match the chunks built now; (3)
+  search refuses a query whose vector has a different number of dimensions from the
+  index, which catches every realistic model mix-up.
+
+- **When to revisit:** when the corpus grows past the point where exact search is fast,
+  or when a third embedding model is worth comparing.
+
+- **Date:** 2026-09-23
 
 ---
 

@@ -21,7 +21,10 @@ What this layer guarantees, and why each one matters:
 
 from __future__ import annotations
 
+import base64
+import binascii
 import os
+import struct
 import time
 from collections.abc import Sequence
 
@@ -176,6 +179,11 @@ class ModelClient:
         payload: dict[str, JSONValue] = {
             "model": request.model,
             "input": list(request.inputs),
+            # Base64-encoded float32 rather than a JSON list of decimals: about a third
+            # of the size, which matters when a full index is 15,000 vectors held in
+            # the response cache. A provider that ignores this and returns plain lists
+            # is handled too - see _vector_of.
+            "encoding_format": "base64",
         }
         if request.provider:
             payload["provider"] = {"order": [request.provider], "allow_fallbacks": False}
@@ -338,15 +346,31 @@ def _read_embedding_body(body: JSONValue, *, expected: int) -> tuple[tuple[float
             f"asked for {expected} embeddings and received {len(data)}; "
             "vectors would be misaligned with their texts"
         )
-    ordered: list[tuple[float, ...]] = []
-    for position, item in enumerate(_sorted_by_index(data)):
-        vector = item.get("embedding") if isinstance(item, dict) else None
-        if not isinstance(vector, list) or not vector:
-            raise ModelError(f"embedding {position} is missing or empty")
-        if not all(isinstance(value, int | float) for value in vector):
+    return tuple(
+        _vector_of(item.get("embedding"), position)
+        for position, item in enumerate(_sorted_by_index(data))
+    )
+
+
+def _vector_of(raw: JSONValue, position: int) -> tuple[float, ...]:
+    """Decode one embedding, whether it arrived as base64 float32 or a list of numbers."""
+    if isinstance(raw, str):
+        try:
+            decoded = base64.b64decode(raw, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise ModelError(f"embedding {position} is not valid base64: {exc}") from exc
+        if not decoded or len(decoded) % 4:
+            raise ModelError(
+                f"embedding {position} decoded to {len(decoded)} bytes, "
+                "which is not a whole number of 32-bit floats"
+            )
+        values = struct.unpack(f"<{len(decoded) // 4}f", decoded)
+        return tuple(float(value) for value in values)
+    if isinstance(raw, list) and raw:
+        if not all(isinstance(value, int | float) for value in raw):
             raise ModelError(f"embedding {position} contains a non-numeric value")
-        ordered.append(tuple(float(value) for value in vector if isinstance(value, int | float)))
-    return tuple(ordered)
+        return tuple(float(value) for value in raw if isinstance(value, int | float))
+    raise ModelError(f"embedding {position} is missing or empty")
 
 
 def _sorted_by_index(data: Sequence[JSONValue]) -> list[dict[str, JSONValue]]:

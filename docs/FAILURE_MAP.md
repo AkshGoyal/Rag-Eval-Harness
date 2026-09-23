@@ -34,6 +34,8 @@ until its failure modes are listed here.
 | A run stopped partway with a spending message | [Model calls — the budget cap tripped](#model-calls--the-budget-cap-tripped) |
 | Answers end mid-sentence | [Model calls — truncated output](#model-calls--truncated-output) |
 | A call is refused with "no price is known" | [Model calls — a model with no price](#model-calls--a-model-with-no-price) |
+| `retrieve` says a saved index "covers different chunks" | [Vector search — a stale saved index](#vector-search--a-stale-saved-index) |
+| `retrieve` refuses to start because the estimate exceeds the limit | [Vector search — the estimate is over the limit](#vector-search--the-estimate-is-over-the-limit) |
 | Identical configurations give different answers weeks apart | [Model calls — an alias was re-pointed](#model-calls--an-alias-was-re-pointed) |
 
 ---
@@ -314,6 +316,30 @@ until its failure modes are listed here.
   cannot be attributed to a specific model after the fact.
 - **Prevented or caught by:** nothing automatic yet. A configuration check rejecting
   alias ids belongs with the generator's configuration in the next phase.
+
+---
+
+### Vector search — a stale saved index
+
+- **What fails:** the saved index on disk was built from different chunks than the ones
+  built now — usually because chunking code changed without the configuration changing.
+- **Symptom:** `retrieve` stops with "covers different chunks ... delete that directory
+  to rebuild it".
+- **Look first:** the directory named in the message, under `data/indexes/`. Its
+  `manifest.json` says which model built it and when.
+- **Fix / recover:** delete that directory and run again. The response cache still holds
+  every batch whose text did not change, so only changed chunks cost anything.
+- **Prevented or caught by:** `tests/test_dense.py::test_a_saved_index_for_different_chunks_is_refused`.
+
+### Vector search — the estimate is over the limit
+
+- **What fails:** the cost estimate for embedding every chunk exceeds `--limit-usd`.
+- **Symptom:** `retrieve` refuses to start and prints both numbers. Nothing is spent.
+- **Look first:** whether the chunk count is what you expected. A much smaller chunk
+  size multiplies the number of chunks, and a more expensive model multiplies the price.
+- **Fix / recover:** raise `--limit-usd` deliberately if the estimate is right. Run with
+  `--dry-run` to see the estimate without starting.
+- **Prevented or caught by:** the estimate check in `src/rag_eval/retrieval_run.py`.
 
 ---
 

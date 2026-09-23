@@ -1,0 +1,31 @@
+# Vector search with Qwen3 Embedding 8B: half the price of OpenAI's small model and
+# four times the context. Differs from dense-openai-small only in the embedding model.
+name: dense-qwen-8b
+
+corpus:
+  name: cuad
+  version: v1
+  hash: null                      # filled by ingestion
+
+chunking:
+  strategy: fixed_char
+  size: 2000                      # characters; about 500 tokens
+  overlap: 250
+
+embedding:
+  model: qwen/qwen3-embedding-8b
+
+retrieval:
+  method: dense
+  top_k: 5
+
+generation:
+  model: meta-llama/llama-3.1-8b-instruct   # D-010: cheap, deliberately modest
+  prompt: prompts/generate/v1.md            # written when generation is built
+  temperature: 0.0
+  max_output_tokens: 512
+
+judge:
+  model: deepseek/deepseek-v4-flash         # D-010: leading candidate; decided in Phase 8
+  rubric: prompts/judge/v1.md               # written when the judge is built
+  max_output_tokens: 512

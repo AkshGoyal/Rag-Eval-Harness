@@ -14,11 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from rag_eval.llm.budget import BudgetGuard
-from rag_eval.llm.cache import ResponseCache
-from rag_eval.llm.catalog import fetch_catalog, fetch_embedding_catalog, prices_from
-from rag_eval.llm.client import ModelClient
-from rag_eval.llm.prices import load_manual_prices, merge_prices
+from rag_eval.llm.factory import build_client
 from rag_eval.llm.transport import Transport
 from rag_eval.llm.types import CallRecord, ChatRequest, EmbeddingRequest, Message, Role
 
@@ -61,19 +57,16 @@ def run_smoke_test(
         ModelError: if either call fails.
         BudgetExceededError: if the limit is reached, which would itself be a finding.
     """
-    chat_models = fetch_catalog(transport, base_url=base_url, api_key=api_key)
-    embedding_models, note = fetch_embedding_catalog(transport, base_url=base_url, api_key=api_key)
-    prices = merge_prices(
-        prices_from(chat_models + embedding_models), load_manual_prices(manual_prices)
-    )
-    client = ModelClient(
-        transport=transport,
-        cache=ResponseCache(cache_dir),
-        budget=BudgetGuard(limit_usd),
-        prices=prices,
-        base_url=base_url,
+    priced = build_client(
+        transport,
+        cache_dir=cache_dir,
+        limit_usd=limit_usd,
         api_key=api_key,
+        base_url=base_url,
+        price_file=manual_prices,
     )
+    client = priced.client
+    note = priced.catalogue_note
 
     chat = client.chat(
         ChatRequest(

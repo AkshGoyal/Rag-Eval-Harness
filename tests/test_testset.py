@@ -280,3 +280,21 @@ def test_shipped_seed_set_is_intact() -> None:
     assert len(committed) == manifest["case_count"] == 30
     assert all(case["answer_overlap"] < OVERLAP_THRESHOLD for case in committed)
     assert manifest["max_answer_overlap"] < OVERLAP_THRESHOLD
+
+
+def test_rebuilding_an_unchanged_set_leaves_its_files_untouched(tmp_path: Path) -> None:
+    """A rewrite that only changed a timestamp would block the next git pull."""
+    from rag_eval.testset.build import write_testset
+
+    templates = load_templates(TEMPLATES)
+    strata = {CaseType.EXTRACTION_SINGLE: 3}
+    cases, manifest = build_testset(_dataset(), templates, strata=strata)
+    write_testset(tmp_path, cases, manifest)
+    before = (tmp_path / "seed-v1.manifest.json").read_bytes()
+
+    again, later = build_testset(_dataset(), templates, strata=strata)
+    write_testset(
+        tmp_path, again, later.model_copy(update={"created_at": "2099-01-01T00:00:00+00:00"})
+    )
+
+    assert (tmp_path / "seed-v1.manifest.json").read_bytes() == before

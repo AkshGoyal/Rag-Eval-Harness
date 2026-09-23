@@ -20,12 +20,20 @@ not offer a setting that fails.
 
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    model_validator,
+)
 from pydantic_core import ErrorDetails
 
 from rag_eval.errors import ConfigError
@@ -56,14 +64,46 @@ class RetrievalMethod(StrEnum):
     """Keyword search. Needs no model, so it runs offline and free."""
 
     DENSE = "dense"
-    """Vector search over embeddings. Not implemented yet."""
+    """Vector search: meaning, not matching words. Needs the embedding model."""
 
 
-class Provider(StrEnum):
-    """The API a model is called through."""
+_ALIAS = re.compile(r"^~|-latest$|:latest$")
 
-    OPENAI = "openai"
-    GOOGLE = "google"
+
+def _fixed_model_id(value: str) -> str:
+    """Reject a model id that is an alias the gateway can re-point.
+
+    Ids such as "~deepseek/deepseek-v4-flash-latest" are pointers the gateway can
+    move to a newer model without notice. Two runs of one configuration would then
+    call different models, and the difference between them would be unattributable.
+    """
+    if _ALIAS.search(value):
+        raise ValueError(
+            f"{value!r} is an alias the gateway can re-point to a different model; "
+            "name a fixed model instead"
+        )
+    if "/" not in value:
+        raise ValueError(
+            f"{value!r} is not a gateway model id; expected vendor/model, "
+            "for example openai/text-embedding-3-small"
+        )
+    return value
+
+
+ModelId = Annotated[str, Field(min_length=3), AfterValidator(_fixed_model_id)]
+"""A gateway model id, such as ``meta-llama/llama-3.1-8b-instruct``. Never an alias."""
+
+UpstreamProvider = Annotated[
+    str | None,
+    Field(
+        default=None,
+        description=(
+            "Pin calls to this upstream provider, as the gateway names it (for example "
+            "'OpenAI' or 'Novita'). Unpinned, the gateway picks whichever is cheapest "
+            "or fastest at that moment."
+        ),
+    ),
+]
 
 
 class CorpusConfig(_Section):
@@ -98,8 +138,14 @@ class ChunkingConfig(_Section):
 class EmbeddingConfig(_Section):
     """The model that turns chunks and questions into vectors."""
 
-    provider: Provider
-    model: str = Field(min_length=1)
+    model: ModelId
+    provider: UpstreamProvider = None
+    batch_size: int = Field(
+        default=100,
+        ge=1,
+        le=512,
+        description="Chunks sent per request when building an index.",
+    )
 
 
 class RetrievalConfig(_Section):
@@ -112,8 +158,8 @@ class RetrievalConfig(_Section):
 class GenerationConfig(_Section):
     """The model that answers a question from retrieved context."""
 
-    provider: Provider
-    model: str = Field(min_length=1)
+    model: ModelId
+    provider: UpstreamProvider = None
     prompt: str = Field(min_length=1, description="Path to the versioned prompt file.")
     temperature: float = Field(ge=0.0, le=2.0)
     max_output_tokens: int = Field(ge=1)
@@ -122,8 +168,8 @@ class GenerationConfig(_Section):
 class JudgeConfig(_Section):
     """The model that scores an answer, and the rubric it scores against."""
 
-    provider: Provider
-    model: str = Field(min_length=1)
+    model: ModelId
+    provider: UpstreamProvider = None
     rubric: str = Field(min_length=1, description="Path to the versioned rubric file.")
     max_output_tokens: int = Field(ge=1)
 

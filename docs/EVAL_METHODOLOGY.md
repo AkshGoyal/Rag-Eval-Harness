@@ -26,23 +26,35 @@ _TBD._ One entry per metric, using the template below.
 
 ### 1.1 Retrieval metrics
 
-Scored separately from generation, so that a failing case can be attributed to
-"retrieval missed the source" or "generator misused good context". The formal metrics
-arrive in Phase 6; what exists now is the primitive they are built on.
+Scored separately from generation, so a failing case can be attributed to "retrieval
+missed the source" or "the generator misused good context". No model is involved in
+computing any of these. Implemented in `src/rag_eval/metrics/retrieval.py`.
 
-**Did retrieval find the gold passage?** A retrieved chunk counts as finding a gold
-answer when it comes from the right contract *and* its character range overlaps the
-annotated span at all.
+A retrieved chunk **covers** a gold answer span when it comes from the right contract
+and its character range overlaps the span at all. The same clause type in a different
+contract does not count.
 
-- **What it can't detect:** whether the retrieved chunk contains *enough* of the answer.
-  A chunk holding the last three words of a clause counts the same as one holding all of
-  it. Partial credit is deliberate — an answer split by a chunk boundary is still partly
-  present in both neighbours, and scoring that as a miss would understate what the
-  retriever did — but it does mean recall is an optimistic measure at small chunk sizes.
-- **Known bias:** larger chunks are more likely to overlap a span by luck, so recall
-  rises with chunk size for reasons that have nothing to do with search quality. The
-  measured numbers show this and the non-monotonic recall@1 shows its limit.
-- **Where it's implemented:** `Chunk.covers` in `src/rag_eval/pipeline/chunking.py`.
+**hit@k** — share of cases where any chunk in the top k covers any gold span.
+- *Can't detect:* whether enough of the answer was retrieved. A chunk holding the last
+  three words of a clause counts as a hit.
+- *Bias:* larger chunks overlap spans more easily, so hit@k rises with chunk size partly
+  for reasons unrelated to search quality.
+
+**span recall@k** — for each case, the share of its gold spans covered within the top k,
+averaged over cases. Equal to hit@k for single-span answers.
+- *What it adds:* for a multi-hop answer split across several places, finding one piece
+  is a partial result, and hit@k would call it a full one.
+- *Can't detect:* whether the pieces found are the ones that matter most.
+
+**MRR** — mean of 1 / (rank of the first covering chunk), zero when none is found.
+- *What it adds:* rewards putting the answer first, which matters because a generator
+  reads the top passages most closely.
+- *Can't detect:* anything below the first hit.
+
+**What is never folded into these numbers.** Refusal cases have no passage to find; they
+are counted and reported as "not scored", never silently removed. A case whose retrieval
+failed is recorded with its reason and scores zero, so the average stays an average over
+every case attempted.
 
 ### 1.2 Generation metrics
 

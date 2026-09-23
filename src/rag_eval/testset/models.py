@@ -9,6 +9,7 @@ reference answer in this project was written by a model or guessed at.
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -44,6 +45,9 @@ class TestCase(BaseModel):
     """One question, one contract, and what a correct answer would be."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    __test__: ClassVar[bool] = False
+    """Not a pytest test class, despite the name."""
 
     case_id: str = Field(min_length=1)
     question: str = Field(min_length=1)

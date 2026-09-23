@@ -2,10 +2,10 @@
 
 **Current phase:** Phase 5 — Run harness core (model wrapper done; manifest and logs next)
 **Last updated:** 2026-09-19
-**Next action:** dense embeddings and a vector index, then retrieval metrics — at
-which point keyword search and vector search can be compared honestly, which is
-Milestone A. The model setup is proven on real calls (2026-09-23), with real prices
-recorded in D-010.
+**Next action:** Aksh runs `retrieve` for the three configurations — keyword search,
+OpenAI small, Qwen 8B — on his machine. That is the first real comparison. Open question
+for him: exclude the "Parties" category from the test set, where naming the contract by
+a party gives part of the answer away.
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.
@@ -20,9 +20,9 @@ under §1.6 of `CLAUDE.md`.
 | 1 | Repo home and stack selection | **complete** (2026-09-19) — D-001, D-005, D-006 |
 | 2 | Corpus selection and ingestion | **complete** (2026-09-20) — D-003, D-007 |
 | 3 | Seed test set (v0) | **complete** (2026-09-20) — D-008; templates awaiting review |
-| 4 | Reference RAG pipeline | **retrieval complete** (2026-09-20) — D-009; generation blocked on a key |
+| 4 | Reference RAG pipeline | **retrieval complete** — keyword (D-009) and vector (D-011); generation next |
 | 5 | Run harness core | **in progress** — model wrapper, cache, budget cap and retries done (D-010) |
-| 6 | Retrieval metrics — **Milestone A** | not started |
+| 6 | Retrieval metrics — **Milestone A** | **built** (D-011) — awaiting the first real comparison run |
 | 7 | Test set v1 (full) | not started |
 | 8 | Judge | not started |
 | 9 | Judge calibration | not started |
