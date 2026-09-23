@@ -120,6 +120,13 @@ class CallRecord(BaseModel):
     )
     usage: Usage | None = None
     cost_usd: float = Field(default=0.0, ge=0.0)
+    cost_known: bool = Field(
+        default=True,
+        description=(
+            "False when the gateway returned no token usage, so the cost could not be "
+            "computed. Such a call is not counted by the spending limit, and says so."
+        ),
+    )
     truncated: bool = Field(
         default=False,
         description="The model stopped because it hit the output limit, not because it finished.",

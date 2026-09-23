@@ -66,6 +66,44 @@ def fetch_catalog(
     return tuple(sorted(models, key=lambda model: model.model_id))
 
 
+def fetch_embedding_catalog(
+    transport: Transport,
+    *,
+    base_url: str,
+    api_key: str | None = None,
+    timeout_seconds: float = 60.0,
+) -> tuple[tuple[ModelInfo, ...], str | None]:
+    """Read the gateway's separate list of embedding models, if it has one.
+
+    The main model list omits embedding models, so their prices have to come from
+    here. Failure is reported rather than raised: the chat catalogue is still useful
+    without it, and correctness does not depend on this call succeeding, because the
+    client refuses any model it has no price for.
+
+    Returns:
+        The embedding models found, and a note explaining why none were, if none were.
+    """
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    try:
+        status, body = transport.get(
+            f"{base_url.rstrip('/')}/embeddings/models", headers, timeout_seconds
+        )
+    except TransportError as exc:
+        return (), f"embedding model list unreachable: {exc}"
+    if status != 200:
+        return (), f"embedding model list returned HTTP {status}"
+    data = body.get("data") if isinstance(body, dict) else None
+    if not isinstance(data, list):
+        return (), "embedding model list had no 'data' array"
+    models = tuple(
+        sorted(
+            (parsed for entry in data if (parsed := _parse(entry)) is not None),
+            key=lambda model: model.model_id,
+        )
+    )
+    return models, None if models else "embedding model list was empty"
+
+
 def _parse(entry: JSONValue) -> ModelInfo | None:
     """Read one catalogue entry, skipping anything malformed rather than failing the lot."""
     if not isinstance(entry, dict):

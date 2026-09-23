@@ -52,6 +52,14 @@ class ModelError(RagEvalError):
     """A model call failed in a way the caller has to know about."""
 
 
+class UnpricedModelError(ModelError):
+    """The model has no known price, so the spending limit cannot account for it.
+
+    Refused before any network call. The alternative - treating an unknown price as
+    zero - once made every embedding call invisible to the spending limit.
+    """
+
+
 class MissingCredentialsError(ModelError):
     """No API key was available.
 
@@ -193,6 +201,13 @@ class ModelClient:
             self.budget.record(0.0)
             return cached, record
 
+        price = self.prices.get(request.model)
+        if price is None:
+            raise UnpricedModelError(
+                f"no price is known for {request.model}, so the spending limit cannot "
+                "account for it. Check the model id, or add its price to "
+                "configs/prices.yaml with a source and the date you checked it."
+            )
         self.budget.check()
         started = time.monotonic()
         failures: list[str] = []
@@ -218,7 +233,7 @@ class ModelClient:
 
             if status == 200:
                 usage = _usage_of(body)
-                cost = self._cost(request.model, usage)
+                cost = price.cost_of(usage) if usage is not None else 0.0
                 self.budget.record(cost)
                 # Only successful responses are cached. Caching a failure would make
                 # a transient outage permanent for every later run.
@@ -232,6 +247,7 @@ class ModelClient:
                     provider_served=_provider_of(body),
                     usage=usage,
                     cost_usd=cost,
+                    cost_known=usage is not None,
                     latency_seconds=round(time.monotonic() - started, 3),
                 )
 
@@ -260,13 +276,6 @@ class ModelClient:
         sleeper = self._sleep
         if callable(sleeper):
             sleeper(delay)
-
-    def _cost(self, model: str, usage: Usage | None) -> float:
-        """Cost of a call, or zero when the model has no recorded price."""
-        price = self.prices.get(model)
-        if price is None or usage is None:
-            return 0.0
-        return price.cost_of(usage)
 
 
 # -- response reading --------------------------------------------------------

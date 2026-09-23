@@ -38,8 +38,11 @@ class FakeTransport:
         self.requests: list[JSONValue] = []
         self.calls = 0
         self.catalog: JSONValue = {"data": []}
+        self.embedding_catalog: tuple[int, JSONValue] = (404, {"error": "not found"})
 
     def get(self, url: str, headers: Mapping[str, str], timeout: float) -> tuple[int, JSONValue]:
+        if url.endswith("/embeddings/models"):
+            return self.embedding_catalog
         return 200, self.catalog
 
     def post(
@@ -414,3 +417,143 @@ def test_an_unreachable_gateway_is_reported_clearly() -> None:
 
     with pytest.raises(CatalogError, match="no route to host"):
         fetch_catalog(ExplodingTransport(), base_url="https://example.test/api/v1")
+
+
+# --- prices: never assume an unknown price is zero -----------------------------
+
+
+def test_a_model_with_no_known_price_is_refused_before_any_call(tmp_path: Path) -> None:
+    """An unpriced model used to be counted as free, hiding it from the spending limit."""
+    from rag_eval.llm.client import UnpricedModelError
+
+    transport = FakeTransport()
+    client = _client(tmp_path, transport)
+
+    with pytest.raises(UnpricedModelError, match="no price is known"):
+        client.chat(_request(model="unlisted/model"))
+
+    assert transport.calls == 0, "the refusal must happen before any money is spent"
+
+
+def test_missing_usage_is_flagged_rather_than_counted_as_free(tmp_path: Path) -> None:
+    body = _chat_body()
+    assert isinstance(body, dict)
+    del body["usage"]
+    client = _client(tmp_path, FakeTransport([(200, body)]))
+
+    record = client.chat(_request()).record
+
+    assert record.cost_known is False
+
+
+def test_manual_prices_need_a_source_and_a_date(tmp_path: Path) -> None:
+    from rag_eval.errors import ConfigError
+    from rag_eval.llm.prices import load_manual_prices
+
+    good = tmp_path / "good.yaml"
+    good.write_text(
+        "vendor/embed:\n  input_per_million: 0.02\n  source: model page\n  checked: 2026-09-23\n"
+    )
+    assert load_manual_prices(good)["vendor/embed"].input_per_million == 0.02
+
+    unsourced = tmp_path / "bad.yaml"
+    unsourced.write_text("vendor/embed:\n  input_per_million: 0.02\n")
+    with pytest.raises(ConfigError, match="source"):
+        load_manual_prices(unsourced)
+
+
+def test_a_missing_price_file_means_no_manual_prices(tmp_path: Path) -> None:
+    from rag_eval.llm.prices import load_manual_prices
+
+    assert load_manual_prices(tmp_path / "absent.yaml") == {}
+
+
+def test_the_live_catalogue_wins_over_a_manual_price() -> None:
+    from rag_eval.llm.prices import merge_prices
+
+    merged = merge_prices(
+        {"m": ModelPrice(input_per_million=1.0)},
+        {"m": ModelPrice(input_per_million=9.0), "other": ModelPrice(input_per_million=2.0)},
+    )
+
+    assert merged["m"].input_per_million == 1.0
+    assert merged["other"].input_per_million == 2.0
+
+
+def test_the_shipped_price_file_is_valid() -> None:
+    from rag_eval.llm.prices import load_manual_prices
+
+    prices = load_manual_prices(Path("configs/prices.yaml"))
+
+    assert "openai/text-embedding-3-small" in prices
+
+
+# --- the embedding catalogue ------------------------------------------------------
+
+
+def test_embedding_catalogue_is_read_when_available() -> None:
+    from rag_eval.llm.catalog import fetch_embedding_catalog
+
+    transport = FakeTransport()
+    transport.embedding_catalog = (
+        200,
+        {"data": [{"id": "vendor/embed", "pricing": {"prompt": "0.00000002"}}]},
+    )
+
+    models, note = fetch_embedding_catalog(transport, base_url="https://example.test/api/v1")
+
+    assert [model.model_id for model in models] == ["vendor/embed"]
+    assert models[0].price.input_per_million == pytest.approx(0.02)
+    assert note is None
+
+
+def test_an_unavailable_embedding_catalogue_is_reported_not_fatal() -> None:
+    from rag_eval.llm.catalog import fetch_embedding_catalog
+
+    models, note = fetch_embedding_catalog(FakeTransport(), base_url="https://example.test/api/v1")
+
+    assert models == ()
+    assert note is not None and "404" in note
+
+
+# --- the setup check, end to end ---------------------------------------------------
+
+
+def test_setup_check_prices_an_embedding_the_catalogue_omits(tmp_path: Path) -> None:
+    """The bug found on first real use: the chat catalogue has no embedding models,
+    so the embedding call was costed at zero and the spending limit never saw it."""
+    from rag_eval.llm.smoke import run_smoke_test
+
+    transport = FakeTransport(
+        [
+            (200, _chat_body()),
+            (
+                200,
+                {
+                    "data": [{"index": 0, "embedding": [0.1, 0.2]}],
+                    "usage": {"prompt_tokens": 1_000_000},
+                },
+            ),
+        ]
+    )
+    transport.catalog = {
+        "data": [{"id": "chat/model", "pricing": {"prompt": "0.000001", "completion": "0.000002"}}]
+    }
+    prices = tmp_path / "prices.yaml"
+    prices.write_text(
+        "embed/model:\n  input_per_million: 0.02\n  source: test\n  checked: 2026-09-23\n"
+    )
+
+    result = run_smoke_test(
+        transport,
+        base_url="https://example.test/api/v1",
+        chat_model="chat/model",
+        embedding_model="embed/model",
+        cache_dir=tmp_path / "cache",
+        api_key="test-key",
+        manual_prices=prices,
+    )
+
+    assert result.embedding_record.cost_usd == pytest.approx(0.02)
+    assert result.catalogue_note is not None
+    assert result.chat_record.cache_hit is False

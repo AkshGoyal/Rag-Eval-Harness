@@ -19,7 +19,7 @@ isn't in this file, that's a bug in our process.
 | D-007 | Dataset normalised on ingest, fetched over plain HTTPS, fingerprinted | 2 | 2026-09-20 | active |
 | D-008 | Questions from hand-written templates; retrieval searches all 510 contracts | 3 | 2026-09-20 | **amended** — contracts named from their own text |
 | D-009 | Character chunking and BM25 keyword retrieval, both offline | 4 | 2026-09-20 | active |
-| D-010 | One gateway (OpenRouter), pinned providers, everything through one wrapper | 5 | 2026-09-20 | active |
+| D-010 | One gateway (OpenRouter), pinned providers, everything through one wrapper | 5 | 2026-09-20 | **amended** 2026-09-23 — real prices, aliases, unpriced models |
 
 Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
@@ -601,6 +601,44 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
   the network, every rerun would have cost money again, and nothing would have looked
   wrong — the results would have been correct, just repeatedly paid for. It was caught
   by a test asserting the second identical call does not reach the transport.
+
+- **Amendment, 2026-09-23 — first contact with the real gateway.** Aksh ran the setup
+  check on his machine; the key, the model ids and the response shapes all worked on
+  the first attempt. Llama 3.1 8B was served by Novita (unpinned, so the gateway chose),
+  and the embedding by OpenAI at 1,536 dimensions. It also surfaced three things.
+
+  *Real prices*, read from the gateway's own catalogue rather than from aggregators,
+  in dollars per million tokens, input / output:
+
+  | Model | Real | Earlier estimate |
+  |---|---|---|
+  | `meta-llama/llama-3.1-8b-instruct` | 0.05 / 0.08 | 0.02 / 0.05 |
+  | `deepseek/deepseek-v4.1-flash` | 0.10 / 0.50 | 0.06 / 0.18 |
+  | `deepseek/deepseek-v4-flash` | 0.0825 / 0.1649 | — |
+  | `meta-llama/llama-3.2-3b-instruct` | 0.05 / 0.33 | — |
+
+  The generator choice holds up better than expected: the 8B model is cheaper on
+  output than both the 3B and 1B models, so smaller is not cheaper here. For the
+  judge, output price matters more than input because it writes a reasoned verdict,
+  which makes `deepseek/deepseek-v4-flash` the leading candidate over v4.1 at about a
+  third of the output price. That is decided in Phase 8, not here. With those two, a
+  full 100-case A/B run costs about ₹10 rather than the ₹6 estimated.
+
+  *Aliases are a reproducibility trap.* Several ids in the catalogue begin with `~` or
+  end in `-latest` — `~deepseek/deepseek-v4-flash-latest`, for instance. These are
+  pointers the gateway can re-aim at a different model without notice, which is the
+  same failure as silent provider routing wearing a different name: two runs of an
+  identical configuration would call different models. Configurations must name a
+  fixed model, never an alias.
+
+  *An unpriced model was counted as free.* The gateway's main model list omits
+  embedding models entirely, and the client treated a missing price as zero. That made
+  embeddings — the largest single cost in the project — invisible to the spending
+  limit, with nothing to show it. The client now refuses, before any network call, to
+  use a model it has no price for; the embedding list is read from its own endpoint
+  where available; and `configs/prices.yaml` fills any remaining gap, each entry with
+  its source and the date it was checked. A call whose usage the gateway does not
+  report is flagged `cost_known: false` rather than silently costed at zero.
 
 - **When to revisit:** the judge, after calibration in Phase 9 measures whether it
   agrees with Aksh. The generator, once there is a reason to prefer a stronger one. The

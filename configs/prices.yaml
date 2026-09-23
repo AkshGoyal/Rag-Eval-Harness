@@ -1,0 +1,24 @@
+# Prices for models the gateway's catalogue does not list, in US dollars per
+# million tokens. The live catalogue always wins where it has a price; these only
+# fill gaps. Every entry says where the number came from and when it was checked,
+# because a price nobody can trace is a price nobody should trust.
+#
+# Why this file exists: OpenRouter's main model list omits embedding models, and
+# a model with no known price used to be counted as free - which made embeddings,
+# the largest single cost in this project, invisible to the spending limit. A
+# model with no price anywhere is now refused rather than assumed to cost nothing.
+
+openai/text-embedding-3-small:
+  input_per_million: 0.02
+  source: OpenRouter model page, via search summary; matches OpenAI's own list price
+  checked: 2026-09-23
+
+baai/bge-m3:
+  input_per_million: 0.01
+  source: OpenRouter model page, via search summary
+  checked: 2026-09-23
+
+openai/text-embedding-3-large:
+  input_per_million: 0.13
+  source: OpenRouter model page, via search summary
+  checked: 2026-09-23

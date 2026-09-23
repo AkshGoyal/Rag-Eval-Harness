@@ -5,12 +5,13 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 from rag_eval.dataset.ingest import ingest_cuad
 from rag_eval.dataset.loader import load_dataset
 from rag_eval.errors import RagEvalError
-from rag_eval.llm.catalog import fetch_catalog
+from rag_eval.llm.catalog import fetch_catalog, fetch_embedding_catalog
 from rag_eval.llm.client import API_KEY_VARIABLE, OPENROUTER_BASE_URL
 from rag_eval.llm.smoke import run_smoke_test
 from rag_eval.llm.transport import HttpTransport
@@ -50,8 +51,18 @@ def build_parser() -> argparse.ArgumentParser:
     smoke.add_argument("--embedding-model", default="openai/text-embedding-3-small")
     smoke.add_argument("--provider", default=None, help="pin to one upstream provider")
     smoke.add_argument("--cache", type=Path, default=Path(".cache/llm"))
+    smoke.add_argument(
+        "--fresh",
+        action="store_true",
+        help="use an empty cache, so both calls really reach the gateway",
+    )
 
     return parser
+
+
+def _money(usd: float) -> str:
+    """Show a cost with enough precision to see it. Single calls cost millionths of a dollar."""
+    return f"${usd:.8f}" if usd < 0.01 else f"${usd:.4f}"
 
 
 def _api_key() -> str | None:
@@ -88,9 +99,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  categories   {manifest.category_count}")
             print(f"  fingerprint  {manifest.content_hash}")
         elif args.command == "models":
-            catalog = fetch_catalog(
-                HttpTransport(), base_url=OPENROUTER_BASE_URL, api_key=_api_key()
+            transport = HttpTransport()
+            chat_catalog = fetch_catalog(
+                transport, base_url=OPENROUTER_BASE_URL, api_key=_api_key()
             )
+            embedding_catalog, note = fetch_embedding_catalog(
+                transport, base_url=OPENROUTER_BASE_URL, api_key=_api_key()
+            )
+            catalog = chat_catalog + embedding_catalog
             shown = [
                 model
                 for model in catalog
@@ -107,32 +123,51 @@ def main(argv: list[str] | None = None) -> int:
                 )
             if len(shown) > args.limit:
                 print(f"\n... and {len(shown) - args.limit} more; narrow with --search")
+            if note:
+                print(f"\nNote: {note}.")
+                print("Embedding prices then come from configs/prices.yaml.")
 
         elif args.command == "check-models":
+            cache_dir = args.cache
+            if args.fresh:
+                cache_dir = Path(tempfile.mkdtemp(prefix="rag-eval-smoke-"))
             result = run_smoke_test(
                 HttpTransport(),
                 base_url=OPENROUTER_BASE_URL,
                 chat_model=args.chat_model,
                 embedding_model=args.embedding_model,
-                cache_dir=args.cache,
+                cache_dir=cache_dir,
                 api_key=_api_key(),
                 provider=args.provider,
             )
-            print("Chat")
-            print(f"  model      {result.chat_record.model}")
-            print(f"  served by  {result.chat_record.provider_served or 'not reported'}")
-            print(f"  answer     {result.chat_text}")
-            print(f"  tokens     {result.chat_record.usage}")
-            print(f"  cost       ${result.chat_record.cost_usd:.6f}")
-            print(f"  truncated  {result.chat_record.truncated}")
-            print(f"  attempts   {result.chat_record.attempts}")
-            print("\nEmbedding")
-            print(f"  model      {result.embedding_record.model}")
-            print(f"  served by  {result.embedding_record.provider_served or 'not reported'}")
-            print(f"  dimensions {result.embedding_dimensions}")
-            print(f"  cost       ${result.embedding_record.cost_usd:.6f}")
-            print(f"\nTotal cost of this check: ${result.total_cost_usd:.6f}")
-            print("Run it again and both calls should come from the cache, costing nothing.")
+            for label, record in (
+                ("Chat", result.chat_record),
+                ("Embedding", result.embedding_record),
+            ):
+                print(label)
+                print(f"  model       {record.model}")
+                cached = "yes - no network call, no cost" if record.cache_hit else "no - real call"
+                print(f"  from cache  {cached}")
+                print(f"  served by   {record.provider_served or 'not reported'}")
+                print(f"  tokens      {record.usage}")
+                print(
+                    f"  cost        {_money(record.cost_usd)}"
+                    f"{'' if record.cost_known else '  (unknown: no usage reported)'}"
+                )
+                print(f"  attempts    {record.attempts}")
+                if label == "Chat":
+                    print(f"  truncated   {record.truncated}")
+                    print(f"  answer      {result.chat_text}")
+                else:
+                    print(f"  dimensions  {result.embedding_dimensions}")
+                print()
+            print(f"Total: {_money(result.total_cost_usd)}")
+            if result.catalogue_note:
+                print(
+                    f"Note: {result.catalogue_note}; embedding price came from configs/prices.yaml."
+                )
+            if not args.fresh:
+                print("Run again: both calls should say 'from cache: yes' and cost nothing.")
 
         elif args.command == "build-testset":
             dataset = load_dataset(args.dataset, verify_files=False)

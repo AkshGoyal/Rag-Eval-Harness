@@ -2,10 +2,10 @@
 
 **Current phase:** Phase 5 — Run harness core (model wrapper done; manifest and logs next)
 **Last updated:** 2026-09-19
-**Next action:** Aksh runs `check-models` on his machine to prove the key works, and
-`models` to read the real prices. Then dense embeddings and a vector index, then
-retrieval metrics — at which point keyword search and vector search can be compared
-honestly, which is Milestone A.
+**Next action:** dense embeddings and a vector index, then retrieval metrics — at
+which point keyword search and vector search can be compared honestly, which is
+Milestone A. The model setup is proven on real calls (2026-09-23), with real prices
+recorded in D-010.
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.

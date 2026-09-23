@@ -33,6 +33,8 @@ until its failure modes are listed here.
 | A rerun returns old answers under a new model's name | [Model calls — a stale cache entry](#model-calls--a-stale-cache-entry) |
 | A run stopped partway with a spending message | [Model calls — the budget cap tripped](#model-calls--the-budget-cap-tripped) |
 | Answers end mid-sentence | [Model calls — truncated output](#model-calls--truncated-output) |
+| A call is refused with "no price is known" | [Model calls — a model with no price](#model-calls--a-model-with-no-price) |
+| Identical configurations give different answers weeks apart | [Model calls — an alias was re-pointed](#model-calls--an-alias-was-re-pointed) |
 
 ---
 
@@ -282,6 +284,36 @@ until its failure modes are listed here.
 - **Prevented or caught by:** `tests/test_dataset.py::test_contract_text_survives_the_disk_byte_for_byte`,
   which catches the read side anywhere, and the Windows job in CI, which is the only
   thing that can catch the write side. Found on the first run on a Windows laptop.
+
+---
+
+### Model calls — a model with no price
+
+- **What fails:** a configuration names a model the gateway's catalogue does not price
+  and `configs/prices.yaml` does not list.
+- **Symptom:** the call is refused before it is made, with a message naming the model.
+  This is deliberate. The previous behaviour — counting the call as free — hid every
+  embedding call from the spending limit and showed nothing.
+- **Look first:** `uv run python -m rag_eval models --search <name>`. If the model is
+  not listed, check the id for a typo. If it genuinely exists but is unpriced, read its
+  price from the gateway's website.
+- **Fix / recover:** add the model to `configs/prices.yaml` with its price, where the
+  number came from, and the date you checked it.
+- **Prevented or caught by:** `tests/test_llm.py::test_a_model_with_no_known_price_is_refused_before_any_call`
+  and `::test_setup_check_prices_an_embedding_the_catalogue_omits`.
+
+### Model calls — an alias was re-pointed
+
+- **What fails:** the configuration names an alias such as
+  `~deepseek/deepseek-v4-flash-latest`, and the gateway re-aims it at a newer model.
+- **Symptom:** a rerun of an unchanged configuration produces different answers, and
+  nothing in the configuration changed to explain it.
+- **Look first:** whether any model id in the configuration starts with `~` or ends in
+  `-latest`.
+- **Fix / recover:** name a fixed model instead. Results produced under the alias
+  cannot be attributed to a specific model after the fact.
+- **Prevented or caught by:** nothing automatic yet. A configuration check rejecting
+  alias ids belongs with the generator's configuration in the next phase.
 
 ---
 
