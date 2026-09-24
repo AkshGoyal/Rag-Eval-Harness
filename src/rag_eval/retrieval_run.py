@@ -20,6 +20,7 @@ from rag_eval.pipeline.chunking import Chunk
 from rag_eval.pipeline.corpus import build_chunks
 from rag_eval.retrieval.bm25 import BM25Index
 from rag_eval.retrieval.dense import build_or_load, estimate_cost_usd, index_key
+from rag_eval.retrieval.hybrid import HybridRetriever
 from rag_eval.testset.models import TestCase
 
 
@@ -76,6 +77,19 @@ def run_retrieval(
         if searcher_or_none is None:
             return 0
         searcher = searcher_or_none
+        if config.retrieval.method is RetrievalMethod.HYBRID:
+            fusion = config.retrieval.hybrid
+            assert fusion is not None, "filled in by RetrievalConfig for every hybrid run"
+            searcher = HybridRetriever(
+                (BM25Index(chunks), searcher),
+                chunks,
+                rank_constant=fusion.rank_constant,
+                candidates=fusion.candidates,
+            )
+            print(
+                f"  merge        keyword + vector by rank (constant {fusion.rank_constant}, "
+                f"top {fusion.candidates} from each)"
+            )
 
     report = evaluate_retrieval(cases, searcher)
     _print_report(report, show_cases=show_cases)

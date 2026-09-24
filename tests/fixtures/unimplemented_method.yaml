@@ -10,7 +10,7 @@ chunking:
 embedding:
   model: openai/text-embedding-3-small
 retrieval:
-  method: hybrid
+  method: rerank
   top_k: 5
 generation:
   model: meta-llama/llama-3.1-8b-instruct

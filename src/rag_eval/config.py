@@ -66,6 +66,9 @@ class RetrievalMethod(StrEnum):
     DENSE = "dense"
     """Vector search: meaning, not matching words. Needs the embedding model."""
 
+    HYBRID = "hybrid"
+    """Keyword and vector search, their rankings merged. Needs the embedding model."""
+
 
 _ALIAS = re.compile(r"^~|-latest$|:latest$")
 
@@ -156,11 +159,47 @@ class EmbeddingConfig(_Section):
     )
 
 
+class HybridConfig(_Section):
+    """How keyword and vector rankings are merged (reciprocal rank fusion)."""
+
+    rank_constant: int = Field(
+        default=60,
+        ge=1,
+        description="Each chunk scores 1 / (rank_constant + rank) per ranking it is in.",
+    )
+    candidates: int = Field(
+        default=100,
+        ge=1,
+        description="How deep into each ranking the merge looks.",
+    )
+
+
 class RetrievalConfig(_Section):
     """How many chunks are retrieved, and by what method."""
 
     method: RetrievalMethod
     top_k: int = Field(ge=1, description="Number of chunks passed to the generator.")
+    hybrid: HybridConfig | None = Field(
+        default=None,
+        description="Merge settings. Filled with defaults when the method is hybrid.",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _hybrid_settings_only_for_hybrid(cls, data: object) -> object:
+        """Record the merge settings for every hybrid run, and refuse them elsewhere.
+
+        Filling the defaults in, rather than leaving them implicit, puts them in the
+        configuration's fingerprint, so a changed default cannot pass unnoticed.
+        """
+        if not isinstance(data, dict):
+            return data
+        is_hybrid = data.get("method") == RetrievalMethod.HYBRID.value
+        if is_hybrid and data.get("hybrid") is None:
+            return {**data, "hybrid": {}}
+        if not is_hybrid and data.get("hybrid") is not None:
+            raise ValueError("'hybrid' settings are only used when method is 'hybrid'")
+        return data
 
 
 class GenerationConfig(_Section):

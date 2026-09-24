@@ -23,6 +23,7 @@ isn't in this file, that's a bug in our process.
 | D-011 | Vector search: exact, saved by content key, scored three ways | 4/6 | 2026-09-23 | active |
 | D-012 | seed-v2: never ask about what names the contract | 3 | 2026-09-24 | active |
 | D-013 | One host per vector index, unless mixing is allowed on purpose | 6 | 2026-09-24 | active |
+| D-014 | Hybrid search by reciprocal rank fusion, untuned defaults | 6 | 2026-09-24 | active |
 
 Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
@@ -807,6 +808,43 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
   the build's printed cost.
 - **When to revisit:** if a host publishes the precision it serves each model at,
   hosts with the same precision could safely be mixed.
+- **Date:** 2026-09-24
+
+---
+
+## D-014 — Hybrid search by reciprocal rank fusion, untuned defaults
+
+- **Decision:** a third retrieval method, `hybrid`, runs keyword search and vector
+  search and merges their rankings by reciprocal rank fusion (RRF). Each chunk scores
+  `1 / (60 + rank)` in every ranking it appears in, looking 100 deep into each, and the
+  scores are added. The first hybrid configuration pairs keyword search with OpenAI
+  small, the stronger vector model so far.
+- **Context:** the first results showed each method winning somewhere different.
+  Vector search won on "is there a clause" questions (found in top 5: 33% → 83%).
+  Keyword search put the answer first more often on single-value questions (top
+  result right: 43% against 14%). Aksh proposed testing the combination.
+- **Alternatives considered:**
+  - *Weighted score blend* (for example 0.3 × keyword + 0.7 × vector) — rejected: the
+    two scores are on unrelated scales, so they need normalising, and the weight needs
+    tuning. Tuning it on nineteen scored cases would fit the noise and report an
+    inflated number.
+  - *Tune RRF's constant or depth on the test set* — rejected for the same reason. 60
+    is the value from the paper that introduced the method (Cormack, Clarke and
+    Büttcher, 2009), and it is used unchanged.
+  - *A reranker* (a model that re-reads the top candidates) — deferred: it costs a model
+    call per question and is a different experiment.
+- **Why this one:** it uses only ranks, so there is nothing to tune and nothing to
+  normalise. It is the common default for hybrid search, so the result speaks to what
+  a team would actually try first. It costs nothing extra: both indexes already exist,
+  and each question's vector is already cached.
+- **Risks / failure modes:** RRF rewards agreement, so a passage that only one method
+  finds, even at rank 1, can be outranked by a passage both methods rank middling.
+  That can lower "top result right" even when "found in top 5" rises.
+- **How we'd detect it:** the comparison tool will show, case by case, where the hybrid
+  gained or lost against each of its parts.
+- **When to revisit:** if the hybrid wins and the test set grows large enough to split
+  into a part for tuning and a part for reporting. Only then is tuning the weights
+  honest.
 - **Date:** 2026-09-24
 
 ---

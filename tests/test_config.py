@@ -67,7 +67,7 @@ def test_top_k_below_one_is_rejected() -> None:
 
 
 def test_unimplemented_retrieval_method_is_rejected() -> None:
-    """Only implemented methods are accepted; `hybrid` is planned, not available."""
+    """Only implemented methods are accepted; `rerank` is not one of them."""
     with pytest.raises(ConfigError) as caught:
         load_config(FIXTURES / "unimplemented_method.yaml")
 
@@ -139,7 +139,10 @@ def test_a_model_id_without_a_vendor_is_rejected(tmp_path: Path) -> None:
         load_config(path)
 
 
-@pytest.mark.parametrize("name", ["baseline.yaml", "dense-openai-small.yaml", "dense-qwen-8b.yaml"])
+@pytest.mark.parametrize(
+    "name",
+    ["baseline.yaml", "dense-openai-small.yaml", "dense-qwen-8b.yaml", "hybrid-openai-small.yaml"],
+)
 def test_the_shipped_configs_load(name: str) -> None:
     load_config(Path("configs") / name)
 
@@ -155,3 +158,33 @@ def test_the_dense_configs_differ_from_the_baseline_only_where_intended() -> Non
 
     assert changed(baseline, openai_small) == {"retrieval"}
     assert changed(openai_small, qwen) == {"embedding"}
+
+
+def test_the_hybrid_config_differs_from_its_parts_only_in_retrieval() -> None:
+    dense = load_config(Path("configs/dense-openai-small.yaml")).model_dump()
+    hybrid = load_config(Path("configs/hybrid-openai-small.yaml")).model_dump()
+
+    assert {key for key in dense if dense[key] != hybrid[key]} - {"name"} == {"retrieval"}
+    assert hybrid["retrieval"]["method"] == "hybrid"
+
+
+def test_hybrid_merge_settings_are_filled_in_and_fingerprinted(tmp_path: Path) -> None:
+    """Implicit defaults would let a changed default alter results with no trace."""
+    text = Path("configs/hybrid-openai-small.yaml").read_text(encoding="utf-8")
+    bare = tmp_path / "bare.yaml"
+    bare.write_text(text.replace("  hybrid:\n    rank_constant: 60\n    candidates: 100\n", ""))
+
+    explicit = load_config(Path("configs/hybrid-openai-small.yaml"))
+    implicit = load_config(bare)
+
+    assert implicit.retrieval.hybrid is not None
+    assert implicit.content_hash() == explicit.content_hash()
+
+
+def test_hybrid_settings_on_another_method_are_rejected(tmp_path: Path) -> None:
+    text = Path("configs/dense-openai-small.yaml").read_text(encoding="utf-8")
+    path = tmp_path / "dense.yaml"
+    path.write_text(text.replace("  top_k: 5\n", "  top_k: 5\n  hybrid:\n    candidates: 50\n"))
+
+    with pytest.raises(ConfigError, match="only used when method is 'hybrid'"):
+        load_config(path)

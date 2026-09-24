@@ -2,10 +2,10 @@
 
 **Current phase:** Phase 6 — Retrieval metrics (all three configurations run; the paired comparison is next)
 **Last updated:** 2026-09-24
-**Next action:** Aksh reruns the three configurations on seed-v2. Keyword search and
-OpenAI reuse what is already built and cost almost nothing; Qwen rebuilds on a single
-host, DeepInfra (D-013), for about $0.06. After that: build `compare`, which saves each
-run, shows case-by-case flips and runs a paired significance test.
+**Next action:** Aksh runs four configurations on seed-v2: keyword, OpenAI small,
+Qwen 8B (rebuilt on one host, D-013, about $0.06) and hybrid keyword + OpenAI small
+(D-014, free). After that: build `compare`, which saves each run, shows case-by-case
+flips and runs a paired significance test.
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.

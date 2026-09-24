@@ -32,6 +32,7 @@ an A/B comparison is two of these files differing in one field.
 | Chunking | Splitting contracts into retrievable pieces at word boundaries | Deciding how big a chunk should be — that is configuration | `src/rag_eval/pipeline/chunking.py` |
 | BM25 index | Ranking chunks by keyword match, exactly and deterministically | Understanding meaning — it matches words, not ideas | `src/rag_eval/retrieval/bm25.py` |
 | Dense index | Embedding chunks once, saving them under a content key, exact cosine search | Choosing the model — that is configuration | `src/rag_eval/retrieval/dense.py` |
+| Hybrid merge | Combining rankings from several retrievers by rank (reciprocal rank fusion) | How any one ranking is produced | `src/rag_eval/retrieval/hybrid.py` |
 | Retrieval metrics | hit@k, span recall@k and MRR per case type, with errors and unscored cases counted | Anything about generated answers | `src/rag_eval/metrics/retrieval.py` |
 | `retrieve` command | Running one configuration's retrieval against the test set and printing the report | Comparing two runs — that comes next | `src/rag_eval/retrieval_run.py` |
 | Model client | Every call to every model: caching, retries, spend limit, provider pinning | Knowing what a prompt means — it moves requests, not intent | `src/rag_eval/llm/client.py` |
@@ -190,6 +191,7 @@ src/rag_eval/
     base.py     what every retriever provides
     bm25.py     keyword search over an inverted index
     dense.py    vector search, saved under a content key
+    hybrid.py   keyword + vector rankings merged by rank
   metrics/
     retrieval.py  hit@k, span recall@k, MRR
   retrieval_run.py  the `retrieve` command
