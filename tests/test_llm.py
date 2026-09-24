@@ -1,5 +1,11 @@
+from __future__ import annotations
+
+import http.client
+import json
+import urllib.request
 from collections.abc import Mapping
 from pathlib import Path
+from types import TracebackType
 
 import pytest
 
@@ -7,7 +13,7 @@ from rag_eval.hashing import JSONValue
 from rag_eval.llm.budget import BudgetExceededError, BudgetGuard
 from rag_eval.llm.cache import CacheError, ResponseCache, cache_key
 from rag_eval.llm.client import ModelClient, ModelError
-from rag_eval.llm.transport import TransportError
+from rag_eval.llm.transport import HttpTransport, TransportError
 from rag_eval.llm.types import (
     ChatRequest,
     EmbeddingRequest,
@@ -243,6 +249,65 @@ def test_giving_up_records_the_failure(tmp_path: Path) -> None:
 
     assert client.records[-1].error is not None
     assert client.records[-1].cache_hit is False
+
+
+class _Response:
+    """Stands in for what ``urlopen`` returns; ``read`` either succeeds or breaks off."""
+
+    def __init__(self, body: JSONValue | None) -> None:
+        self.body = body
+        self.status = 200
+
+    def __enter__(self) -> _Response:
+        return self
+
+    def __exit__(
+        self,
+        kind: type[BaseException] | None,
+        value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        return None
+
+    def read(self) -> bytes:
+        if self.body is None:
+            raise http.client.IncompleteRead(b"x" * 131034)
+        return json.dumps(self.body).encode("utf-8")
+
+
+def _urlopen_serving(responses: list[_Response]) -> object:
+    served = iter(responses)
+
+    def urlopen(request: urllib.request.Request, timeout: float) -> _Response:
+        return next(served)
+
+    return urlopen
+
+
+def test_a_connection_that_drops_mid_response_is_a_transport_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``IncompleteRead`` is not an ``OSError``; it must still not escape raw."""
+    monkeypatch.setattr(urllib.request, "urlopen", _urlopen_serving([_Response(None)]))
+
+    with pytest.raises(TransportError, match="IncompleteRead"):
+        HttpTransport().post("https://gateway.test/embeddings", {}, {}, timeout=1.0)
+
+
+def test_a_connection_that_drops_mid_response_is_retried(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        urllib.request,
+        "urlopen",
+        _urlopen_serving([_Response(None), _Response(_chat_body("recovered"))]),
+    )
+    client = _client(tmp_path, HttpTransport())
+
+    result = client.chat(_request())
+
+    assert result.text == "recovered"
+    assert result.record.attempts == 2
 
 
 def test_a_failed_call_is_not_cached(tmp_path: Path) -> None:

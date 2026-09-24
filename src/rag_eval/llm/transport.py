@@ -7,6 +7,7 @@ real implementation uses the standard library, so calling a model adds no depend
 
 from __future__ import annotations
 
+import http.client
 import json
 import urllib.error
 import urllib.request
@@ -82,5 +83,10 @@ class HttpTransport:
             return int(exc.code), detail
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise TransportError(f"{url} could not be reached: {exc}") from exc
+        except http.client.HTTPException as exc:
+            # The connection dropped partway through the response (IncompleteRead,
+            # RemoteDisconnected, a malformed status line). Nothing usable arrived,
+            # so this is a transport failure and the caller may retry it.
+            raise TransportError(f"{url} broke off mid-response: {exc!r}") from exc
         except json.JSONDecodeError as exc:
             raise TransportError(f"{url} returned a body that is not JSON: {exc}") from exc
