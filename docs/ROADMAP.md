@@ -1,11 +1,12 @@
 # Roadmap
 
-**Current phase:** Phase 5 — Run harness core (model wrapper done; manifest and logs next)
-**Last updated:** 2026-09-19
-**Next action:** Aksh runs `retrieve` for the three configurations — keyword search,
-OpenAI small, Qwen 8B — on his machine. That is the first real comparison. Open question
-for him: exclude the "Parties" category from the test set, where naming the contract by
-a party gives part of the answer away.
+**Current phase:** Phase 6 — Retrieval metrics (all three configurations run; the paired comparison is next)
+**Last updated:** 2026-09-24
+**Next action:** Aksh decides two things. (1) Whether to drop the "Parties" category
+from the test set, where naming the contract by a party gives part of the answer away.
+(2) Whether to pin a single host for Qwen and rebuild (about $0.06), since the first
+index was built by three hosts. Then build `compare`: saved runs, case-by-case flips
+and a paired significance test. Results so far are recorded in D-011.
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.

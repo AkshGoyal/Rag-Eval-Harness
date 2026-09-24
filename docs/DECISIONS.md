@@ -701,6 +701,27 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
   and peak memory was 427 MB. What that could not test is the real gateway's handling
   of base64, which the setup check exercises on a single call before the full build.
 
+- **Measured on the real gateway (2026-09-24), seed-v1, 19 scored cases:**
+
+  | configuration | hit@1 | hit@3 | hit@5 | hit@10 | span@5 | MRR | build | cost (estimate) |
+  |---|---|---|---|---|---|---|---|---|
+  | keyword (BM25) | 26% | — | 53% | 58% | — | — | seconds | $0 |
+  | OpenAI text-embedding-3-small | 32% | 53% | 74% | 89% | 74% | 0.47 | 572 s | $0.1262 ($0.1524) |
+  | Qwen3 Embedding 8B | 21% | 58% | 63% | 84% | 59% | 0.41 | 1411 s + an interrupted first try | ~$0.064 over both tries ($0.0762) |
+
+  The estimate was high both times, because real text averages about 4.8 characters
+  per token, not 4. Being high is the safe direction for a spending check. Qwen's first
+  build broke off after about 49 of 155 batches when a connection dropped
+  mid-response. That error was not retried then; it is now (commit 5277263). The
+  finished batches came from the cache, so nothing was paid for twice.
+
+  **How far to trust these numbers:** with 19 cases, one case moves a score by about 5
+  points. OpenAI beats Qwen by two cases at hit@5, which is not yet evidence of a real
+  gap. And the Qwen index was **served by three different hosts** (DeepInfra, Nebius,
+  SiliconFlow), because no host was pinned. Hosts can run the same model at different
+  numeric precision, so their vectors may not be exactly comparable, and the Qwen score
+  mixes that in. The OpenAI index came from a single host.
+
 - **Risks / failure modes:** (1) the character-based estimate can be off by perhaps a
   fifth against real token counts; (2) a saved index can be deleted or edited by hand;
   (3) a query embedded by a different model than the index would compare vectors that
