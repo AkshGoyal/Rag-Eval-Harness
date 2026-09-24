@@ -40,7 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
     testset.add_argument("--dataset", type=Path, default=Path("data/cuad/v1"))
     testset.add_argument("--templates", type=Path, default=Path("testset/templates.yaml"))
     testset.add_argument("--out", type=Path, default=Path("testset"))
-    testset.add_argument("--name", default="seed-v1")
+    testset.add_argument("--name", default="seed-v2")
 
     models = commands.add_parser("models", help="list models the gateway offers, with prices")
     models.add_argument("--search", default="", help="only show models whose id contains this")
@@ -52,7 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     retrieve.add_argument("--config", type=Path, required=True)
     retrieve.add_argument("--dataset", type=Path, default=Path("data/cuad/v1"))
-    retrieve.add_argument("--testset", type=Path, default=Path("testset/seed-v1.jsonl"))
+    retrieve.add_argument("--testset", type=Path, default=Path("testset/seed-v2.jsonl"))
     retrieve.add_argument("--indexes", type=Path, default=Path("data/indexes"))
     retrieve.add_argument("--cache", type=Path, default=Path(".cache/llm"))
     retrieve.add_argument(

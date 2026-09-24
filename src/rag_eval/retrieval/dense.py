@@ -146,16 +146,25 @@ def build_or_load(
         ModelError, BudgetExceededError: from the client, if embedding fails.
     """
     directory = root / key[:16]
+    providers: set[str] = set()
 
     def embed_query(text: str) -> NDArray[np.float32]:
         result = client.embed(
             EmbeddingRequest(model=embedding.model, inputs=(text,), provider=embedding.provider)
         )
+        _check_single_provider(embedding, providers, result.record.provider_served, "a question")
         return np.asarray(result.vectors[0], dtype=np.float32)
 
     if (directory / "vectors.npy").is_file():
         vectors = _load(directory, chunks)
         manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+        providers.update(manifest.get("providers_served", []))
+        if len(providers) > 1 and not embedding.allow_mixed_providers:
+            raise DenseIndexError(
+                f"the saved index in {directory} was built by more than one host "
+                f"({', '.join(sorted(providers))}), so its vectors may not be comparable. "
+                f"{_MIXED_PROVIDER_FIX}"
+            )
         return DenseIndex(chunks, vectors, embed_query=embed_query), BuildReport(
             reused=True,
             chunks=len(chunks),
@@ -169,7 +178,6 @@ def build_or_load(
     batches: list[NDArray[np.float32]] = []
     requests = cached = 0
     cost = 0.0
-    providers: set[str] = set()
     size = embedding.batch_size
     total = (len(chunks) + size - 1) // size
 
@@ -186,8 +194,9 @@ def build_or_load(
         requests += 1
         cached += int(result.record.cache_hit)
         cost += result.record.cost_usd
-        if result.record.provider_served:
-            providers.add(result.record.provider_served)
+        _check_single_provider(
+            embedding, providers, result.record.provider_served, f"batch {number}"
+        )
         if progress is not None:
             progress(number, total)
 
@@ -209,6 +218,35 @@ def build_or_load(
         cost_usd=cost,
         providers_served=tuple(sorted(providers)),
     )
+
+
+_MIXED_PROVIDER_FIX = (
+    "Pin one host with `provider:` under `embedding:` in the configuration, or set "
+    "`allow_mixed_providers: true` there to accept the mix knowingly."
+)
+
+
+def _check_single_provider(
+    embedding: EmbeddingConfig, providers: set[str], served: str | None, what: str
+) -> None:
+    """Record which host served a call, stopping as soon as a second host appears.
+
+    Checked per batch rather than at the end, so a mixed build stops after one wasted
+    batch instead of after all of them.
+
+    Raises:
+        DenseIndexError: if ``served`` differs from a host already seen, and mixing
+            has not been allowed.
+    """
+    if not served:
+        return
+    if providers and served not in providers and not embedding.allow_mixed_providers:
+        raise DenseIndexError(
+            f"{what} was served by {served}, but this index's vectors came from "
+            f"{', '.join(sorted(providers))}. Hosts can run the same model at different "
+            f"precision, so the vectors may not be comparable. {_MIXED_PROVIDER_FIX}"
+        )
+    providers.add(served)
 
 
 def _normalise(vectors: NDArray[np.float32]) -> NDArray[np.float32]:

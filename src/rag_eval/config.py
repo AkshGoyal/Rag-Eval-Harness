@@ -146,6 +146,14 @@ class EmbeddingConfig(_Section):
         le=512,
         description="Chunks sent per request when building an index.",
     )
+    allow_mixed_providers: bool = Field(
+        default=False,
+        description=(
+            "Accept an index whose vectors came from more than one upstream host. Off by "
+            "default: hosts can run the same model at different numeric precision, so "
+            "their vectors are not guaranteed to be comparable."
+        ),
+    )
 
 
 class RetrievalConfig(_Section):

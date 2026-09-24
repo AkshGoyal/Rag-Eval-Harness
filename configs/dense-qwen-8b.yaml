@@ -14,6 +14,8 @@ chunking:
 
 embedding:
   model: qwen/qwen3-embedding-8b
+  provider: DeepInfra             # one host for every vector; the first, unpinned build
+                                  # was split across three (D-011)
 
 retrieval:
   method: dense

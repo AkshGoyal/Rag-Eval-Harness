@@ -207,8 +207,9 @@ src/rag_eval/
     build.py    reproducible, stratified case selection
 testset/
   templates.yaml        82 phrasings, 41 categories — the file to review
-  seed-v1.jsonl         the 30 committed cases
-  seed-v1.manifest.json how they were built, and from what
+  seed-v2.jsonl         the 30 current cases (D-012)
+  seed-v2.manifest.json how they were built, and from what
+  seed-v1.*             the first set, kept because the first results used it
 configs/
   baseline.yaml the starting configuration, the "A" of every comparison
 tests/

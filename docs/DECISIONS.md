@@ -21,6 +21,8 @@ isn't in this file, that's a bug in our process.
 | D-009 | Character chunking and BM25 keyword retrieval, both offline | 4 | 2026-09-20 | active |
 | D-010 | One gateway (OpenRouter), pinned providers, everything through one wrapper | 5 | 2026-09-20 | **amended** 2026-09-23 — real prices, aliases, unpriced models |
 | D-011 | Vector search: exact, saved by content key, scored three ways | 4/6 | 2026-09-23 | active |
+| D-012 | seed-v2: never ask about what names the contract | 3 | 2026-09-24 | active |
+| D-013 | One host per vector index, unless mixing is allowed on purpose | 6 | 2026-09-24 | active |
 
 Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 
@@ -736,6 +738,76 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
   or when a third embedding model is worth comparing.
 
 - **Date:** 2026-09-23
+
+---
+
+## D-012 — seed-v2: never ask about what names the contract
+
+- **Decision:** the test set never asks about "Document Name" or "Parties". The
+  current set is `seed-v2` (fingerprint `7bd3e036…a626`). `seed-v1` stays committed,
+  because the first retrieval results were measured on it.
+- **Context:** every question names its contract, and since D-008's amendment that name
+  is built from the contract's own "Document Name" and "Parties" annotations. So asking
+  about either of them puts part of the answer in the question: "Who are the parties
+  to the Didi Chuxing Technology Co., Ltd Collaboration Agreement?" already names one
+  party. The overlap check did not catch it, because it compares the question with
+  the whole answer and one party out of two falls under its threshold. seed-v1 had
+  three such cases (0010–0012), all Parties.
+- **Alternatives considered:**
+  - *Keep them and rely on the overlap check* — rejected: the check measured these
+    cases as acceptable, so it is the wrong tool for this leak.
+  - *Name the contract some other way for these questions* — rejected: a name the
+    corpus does not contain is what caused the 0/19 retrieval failure in D-008.
+  - *Keep Parties but score only the party not in the name* — rejected: extra
+    complexity for a category that tests how contracts are named more than retrieval.
+- **Why this one:** it removes the leak at its source, and the exclusion is tied in
+  code to the same list the naming uses (`NAMING_CATEGORIES`), so the two cannot drift
+  apart. The selection seed is unchanged, so seed-v2 keeps 27 of seed-v1's 30 cases
+  and replaces only the three Parties ones (with Governing Law, Warranty Duration and
+  Expiration Date cases). That keeps results on the two sets roughly comparable.
+- **Risks / failure modes:** multi-part extraction questions now come from a smaller
+  pool, 213 instead of 721, because 508 of the 721 were Parties. Scores on seed-v1
+  and seed-v2 are not directly comparable, even though they share 27 cases.
+- **How we'd detect it:** the manifest records `excluded_categories`, and a test fails
+  if the committed set contains a naming category.
+- **When to revisit:** if contracts are ever named some other way than from their
+  own annotations.
+- **Date:** 2026-09-24
+
+---
+
+## D-013 — One host per vector index, unless mixing is allowed on purpose
+
+- **Decision:** a vector index must come from a single upstream host. A build stops
+  at the first batch served by a different host from the earlier ones. A saved index
+  that records more than one host is refused, and so is a question whose vector came
+  from a host that did not build the index. Setting `allow_mixed_providers: true`
+  under `embedding:` accepts the mix deliberately. The Qwen configuration now pins
+  `provider: DeepInfra`.
+- **Context:** the first Qwen build was split across DeepInfra, Nebius and SiliconFlow
+  (D-011). They all serve the same model, but a host can run it at lower numeric
+  precision to save cost, and nothing tells us which one does. Mixed vectors would
+  add a variable that no configuration records, which is the thing D-006 and D-010
+  exist to prevent.
+- **Alternatives considered:**
+  - *Only record the hosts* — this is what happened: the output printed them and
+    nobody noticed until the results were read closely.
+  - *Check only at the end of a build* — rejected: the batches would already be paid
+    for. Checking per batch wastes at most one.
+  - *Always require a pinned host* — rejected: OpenAI's model has a single host, so
+    requiring a pin there would force a pointless rebuild (the host is part of the
+    index key).
+- **Why this one:** it costs nothing when there is one host, and when there are
+  several it stops early with a message that says exactly how to fix it.
+- **Risks / failure modes:** with `allow_fallbacks: false`, a pinned host that is down
+  fails the call rather than going to another host. The cost is worked out from the
+  catalogue's price for the model, which may not be what the pinned host charges.
+- **How we'd detect it:** a pinned host that is down shows up as retries, then a
+  model error naming it. For a price gap, compare OpenRouter's activity page with
+  the build's printed cost.
+- **When to revisit:** if a host publishes the precision it serves each model at,
+  hosts with the same precision could safely be mixed.
+- **Date:** 2026-09-24
 
 ---
 

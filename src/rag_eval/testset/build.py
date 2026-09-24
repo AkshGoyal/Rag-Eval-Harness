@@ -74,6 +74,12 @@ MAX_CASES_PER_CONTRACT = 2
 """Keep the set spread across contracts, so scores are not dominated by whether one
 document happens to chunk well."""
 
+NAMING_CATEGORIES: tuple[str, ...] = ("Document Name", "Parties")
+"""Categories whose annotated text is used to name each contract in its questions.
+Asking about them would put part of the answer in the question — "Who are the parties
+to the Didi Chuxing Collaboration Agreement?" already names one party — so they are
+never asked. seed-v1 predates this rule and contains three Parties cases."""
+
 SEED_STRATA: dict[CaseType, int] = {
     CaseType.EXTRACTION_SINGLE: 7,
     CaseType.EXTRACTION_MULTI: 6,
@@ -112,9 +118,9 @@ def _preferred_names(dataset: CorpusView) -> dict[str, str]:
     for label in dataset.labels:
         if not label.present:
             continue
-        if label.category == "Document Name":
+        if label.category == NAMING_CATEGORIES[0]:
             document_names[label.contract_id] = tuple(span.text for span in label.spans)
-        elif label.category == "Parties":
+        elif label.category == NAMING_CATEGORIES[1]:
             parties[label.contract_id] = tuple(span.text for span in label.spans)
 
     return {
@@ -136,7 +142,9 @@ def build_testset(
     dataset: CorpusView,
     templates: TemplateSet,
     *,
-    name: str = "seed-v1",
+    name: str = "seed-v2",
+    # Unchanged since seed-v1 on purpose: the same seed draws the same cases, so
+    # seed-v2 differs from seed-v1 only where a naming category was replaced.
     seed: str = "rag-eval-harness/seed-v1",
     strata: dict[CaseType, int] | None = None,
 ) -> tuple[tuple[TestCase, ...], TestSetManifest]:
@@ -163,6 +171,8 @@ def build_testset(
         case_type: [] for case_type in CaseType
     }
     for label in dataset.labels:
+        if label.category in NAMING_CATEGORIES:
+            continue
         case_type = classify(label, by_category[label.category].style)
         candidates[case_type].append((_rank(seed, f"{label.contract_id}|{label.category}"), label))
     for pool in candidates.values():
@@ -227,6 +237,7 @@ def build_testset(
         case_count=len(cases),
         counts_by_type=dict(sorted(counts.items())),
         excluded_for_leakage=excluded,
+        excluded_categories=NAMING_CATEGORIES,
         max_answer_overlap=max((case.answer_overlap for case in cases), default=0.0),
         overlap_threshold=OVERLAP_THRESHOLD,
         content_hash=_cases_hash(tuple(cases)),

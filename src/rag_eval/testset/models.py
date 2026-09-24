@@ -96,6 +96,10 @@ class TestSetManifest(BaseModel):
     case_count: int = Field(ge=1)
     counts_by_type: dict[str, int]
     excluded_for_leakage: int = Field(ge=0)
+    excluded_categories: tuple[str, ...] = Field(
+        default=(),
+        description="Clause categories never asked about, because they name the contract.",
+    )
     max_answer_overlap: float = Field(ge=0.0, le=1.0)
     overlap_threshold: float = Field(ge=0.0, le=1.0)
     content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")

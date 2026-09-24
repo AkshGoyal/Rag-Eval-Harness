@@ -133,6 +133,75 @@ def test_a_saved_index_for_different_chunks_is_refused(tmp_path: Path) -> None:
         )
 
 
+def test_a_build_served_by_two_hosts_stops_at_the_first_mixed_batch(tmp_path: Path) -> None:
+    """Hosts can run one model at different precision; mixing them must be a choice."""
+    gateway = HashingGateway(providers=("HostA", "HostB"))
+
+    with pytest.raises(DenseIndexError, match="batch 2 was served by HostB"):
+        build_or_load(
+            _chunks(),
+            client=_client(tmp_path, gateway),
+            embedding=_embedding(),
+            key="k" * 64,
+            root=tmp_path / "indexes",
+        )
+
+    assert gateway.embedding_requests == 2, "stop at the mixed batch, not after all of them"
+    assert not (tmp_path / "indexes").exists(), "a refused build must not be saved"
+
+
+def test_mixed_hosts_are_accepted_when_allowed(tmp_path: Path) -> None:
+    gateway = HashingGateway(providers=("HostA", "HostB"))
+    embedding = _embedding().model_copy(update={"allow_mixed_providers": True})
+
+    index, report = build_or_load(
+        _chunks(),
+        client=_client(tmp_path, gateway),
+        embedding=embedding,
+        key="k" * 64,
+        root=tmp_path / "indexes",
+    )
+    index.search("governing law", top_k=1)
+
+    assert report.providers_served == ("HostA", "HostB")
+
+
+def test_a_saved_mixed_index_is_refused_unless_allowed(tmp_path: Path) -> None:
+    gateway = HashingGateway(providers=("HostA", "HostB"))
+    allowed = _embedding().model_copy(update={"allow_mixed_providers": True})
+    build_or_load(
+        _chunks(),
+        client=_client(tmp_path, gateway),
+        embedding=allowed,
+        key="k" * 64,
+        root=tmp_path / "indexes",
+    )
+
+    with pytest.raises(DenseIndexError, match="built by more than one host"):
+        build_or_load(
+            _chunks(),
+            client=_client(tmp_path, gateway),
+            embedding=_embedding(),
+            key="k" * 64,
+            root=tmp_path / "indexes",
+        )
+
+
+def test_a_question_embedded_by_another_host_is_refused(tmp_path: Path) -> None:
+    """Three batches from HostA, then the question arrives from HostB."""
+    gateway = HashingGateway(providers=("HostA", "HostA", "HostA", "HostB"))
+    index, _ = build_or_load(
+        _chunks(),
+        client=_client(tmp_path, gateway),
+        embedding=_embedding(),
+        key="k" * 64,
+        root=tmp_path / "indexes",
+    )
+
+    with pytest.raises(DenseIndexError, match="a question was served by HostB"):
+        index.search("governing law", top_k=1)
+
+
 def test_the_index_key_changes_with_anything_that_changes_the_vectors() -> None:
     chunking = ChunkingConfig(strategy=ChunkStrategy.FIXED_CHAR, size=2000, overlap=250)
     base = index_key("d" * 64, chunking, EmbeddingConfig(model="a/model"))

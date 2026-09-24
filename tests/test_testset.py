@@ -6,6 +6,7 @@ from rag_eval.dataset.models import ClauseLabel, ContractIndexEntry, Span
 from rag_eval.errors import ConfigError, DatasetError
 from rag_eval.testset.build import (
     MAX_CASES_PER_CONTRACT,
+    NAMING_CATEGORIES,
     OVERLAP_THRESHOLD,
     ManifestView,
     build_testset,
@@ -268,18 +269,52 @@ def test_refusal_cases_carry_no_evidence() -> None:
     assert all(case.requires_refusal and case.gold_spans == () for case in cases)
 
 
-def test_shipped_seed_set_is_intact() -> None:
-    """The committed test set must match what the committed inputs produce."""
+@pytest.mark.parametrize("name", ["seed-v1", "seed-v2"])
+def test_shipped_seed_sets_are_intact(name: str) -> None:
+    """Both committed sets stay loadable: seed-v1 results are on record against it."""
     import json
 
     committed = [
-        json.loads(line) for line in Path("testset/seed-v1.jsonl").read_text().splitlines()
+        json.loads(line) for line in Path(f"testset/{name}.jsonl").read_text().splitlines()
     ]
-    manifest = json.loads(Path("testset/seed-v1.manifest.json").read_text())
+    manifest = json.loads(Path(f"testset/{name}.manifest.json").read_text())
 
     assert len(committed) == manifest["case_count"] == 30
     assert all(case["answer_overlap"] < OVERLAP_THRESHOLD for case in committed)
     assert manifest["max_answer_overlap"] < OVERLAP_THRESHOLD
+
+
+def test_the_current_seed_set_never_asks_what_names_the_contract() -> None:
+    import json
+
+    lines = Path("testset/seed-v2.jsonl").read_text().splitlines()
+    manifest = json.loads(Path("testset/seed-v2.manifest.json").read_text())
+
+    assert not {json.loads(line)["category"] for line in lines} & set(NAMING_CATEGORIES)
+    assert tuple(manifest["excluded_categories"]) == NAMING_CATEGORIES
+
+
+def test_naming_categories_are_never_selected() -> None:
+    """The contract is named from these annotations, so asking about them leaks."""
+    parties = tuple(
+        label.model_copy(
+            update={
+                "spans": (
+                    Span(start=0, end=9, text="Acme Corp"),
+                    Span(start=20, end=29, text="Beta Corp"),
+                )
+            }
+        )
+        for label in _pool(40, "Parties", True, 2)
+    )
+    dataset = _FakeDataset(parties + _pool(40, "Governing Law", True, 2))
+    templates = load_templates(TEMPLATES)
+
+    cases, manifest = build_testset(dataset, templates, strata={CaseType.EXTRACTION_MULTI: 10})
+
+    assert len(cases) == 10
+    assert {case.category for case in cases} == {"Governing Law"}
+    assert manifest.excluded_categories == NAMING_CATEGORIES
 
 
 def test_rebuilding_an_unchanged_set_leaves_its_files_untouched(tmp_path: Path) -> None:
@@ -290,11 +325,11 @@ def test_rebuilding_an_unchanged_set_leaves_its_files_untouched(tmp_path: Path) 
     strata = {CaseType.EXTRACTION_SINGLE: 3}
     cases, manifest = build_testset(_dataset(), templates, strata=strata)
     write_testset(tmp_path, cases, manifest)
-    before = (tmp_path / "seed-v1.manifest.json").read_bytes()
+    before = (tmp_path / "seed-v2.manifest.json").read_bytes()
 
     again, later = build_testset(_dataset(), templates, strata=strata)
     write_testset(
         tmp_path, again, later.model_copy(update={"created_at": "2099-01-01T00:00:00+00:00"})
     )
 
-    assert (tmp_path / "seed-v1.manifest.json").read_bytes() == before
+    assert (tmp_path / "seed-v2.manifest.json").read_bytes() == before

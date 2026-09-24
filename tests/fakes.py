@@ -45,8 +45,10 @@ class HashingGateway:
         embed_model: str = "fake/embedder",
         price: str = "0.00000002",
         dimensions: int = DIMENSIONS,
+        providers: tuple[str, ...] = ("FakeProvider",),
     ) -> None:
         self.embed_model = embed_model
+        self.providers = providers
         self.price = price
         self.dimensions = dimensions
         self.embedding_requests = 0
@@ -63,6 +65,7 @@ class HashingGateway:
         assert isinstance(payload, dict)
         inputs = payload["input"]
         assert isinstance(inputs, list)
+        provider = self.providers[self.embedding_requests % len(self.providers)]
         self.embedding_requests += 1
         self.inputs_embedded += len(inputs)
         tokens = sum(len(str(text)) for text in inputs) // 4
@@ -72,7 +75,7 @@ class HashingGateway:
                 for i, text in enumerate(inputs)
             ],
             "usage": {"prompt_tokens": tokens},
-            "provider": "FakeProvider",
+            "provider": provider,
         }
 
 

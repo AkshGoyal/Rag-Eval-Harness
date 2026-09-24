@@ -121,6 +121,8 @@ alternatives (score threshold, binary verdict, conjunction of criteria).
   questions. For a yes/no question, one span is enough to answer, so those are not
   multi-hop however many spans they carry. Genuine multi-span extraction is 721 cases,
   508 of which are "Parties" — a contract names its parties in more than one place.
+  Since seed-v2 (D-012) Parties and Document Name are never asked, because each
+  contract's name is built from them. That leaves 213 multi-span extraction candidates.
 
 - **Leakage checks:** each case records `answer_overlap`, the share of its reference
   answer's distinctive words that already appear in the question. Cases at or above 0.5

@@ -35,6 +35,7 @@ until its failure modes are listed here.
 | Answers end mid-sentence | [Model calls — truncated output](#model-calls--truncated-output) |
 | A call is refused with "no price is known" | [Model calls — a model with no price](#model-calls--a-model-with-no-price) |
 | `retrieve` says a saved index "covers different chunks" | [Vector search — a stale saved index](#vector-search--a-stale-saved-index) |
+| `retrieve` says a batch or question "was served by" another host | [Vector search — more than one host](#vector-search--more-than-one-host) |
 | `retrieve` refuses to start because the estimate exceeds the limit | [Vector search — the estimate is over the limit](#vector-search--the-estimate-is-over-the-limit) |
 | Identical configurations give different answers weeks apart | [Model calls — an alias was re-pointed](#model-calls--an-alias-was-re-pointed) |
 
@@ -330,6 +331,25 @@ until its failure modes are listed here.
 - **Fix / recover:** delete that directory and run again. The response cache still holds
   every batch whose text did not change, so only changed chunks cost anything.
 - **Prevented or caught by:** `tests/test_dense.py::test_a_saved_index_for_different_chunks_is_refused`.
+
+### Vector search — more than one host
+
+- **What fails:** the gateway sends some embedding requests for one model to one host
+  and some to another. Hosts can run the same model at different precision, so the
+  vectors may not be comparable.
+- **Symptom:** `retrieve` stops with "batch N was served by X, but this index's vectors
+  came from Y", or "a question was served by …", or "the saved index … was built by
+  more than one host".
+- **Look first:** the `providers_served` list in `data/indexes/<key>/manifest.json`, and
+  whether the configuration sets `provider:` under `embedding:`.
+- **Fix / recover:** pin a host with `provider:` under `embedding:`. Pinning changes the
+  index key, so a fresh index is built, while the batches that finished before the stop
+  stay cached. Or set `allow_mixed_providers: true` to accept the mix and record why.
+- **Prevented or caught by:** D-013;
+  `tests/test_dense.py::test_a_build_served_by_two_hosts_stops_at_the_first_mixed_batch`
+  and the three tests after it.
+
+---
 
 ### Vector search — the estimate is over the limit
 
