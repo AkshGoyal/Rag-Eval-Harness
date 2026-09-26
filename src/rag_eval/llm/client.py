@@ -95,7 +95,7 @@ class ModelClient:
         base_url: str = OPENROUTER_BASE_URL,
         api_key: str | None = None,
         timeout_seconds: float = 120.0,
-        max_attempts: int = 3,
+        max_attempts: int = 5,
         backoff_seconds: float = 2.0,
         sleep: object = time.sleep,
     ) -> None:
