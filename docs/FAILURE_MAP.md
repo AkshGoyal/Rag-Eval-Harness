@@ -34,6 +34,7 @@ until its failure modes are listed here.
 | A run stopped partway with a spending message | [Model calls — the budget cap tripped](#model-calls--the-budget-cap-tripped) |
 | Answers end mid-sentence | [Model calls — truncated output](#model-calls--truncated-output) |
 | A call is refused with "no price is known" | [Model calls — a model with no price](#model-calls--a-model-with-no-price) |
+| A build stops with "could not be reached" or `getaddrinfo failed` | [Model calls — the network dropped](#model-calls--the-network-dropped) |
 | `retrieve` says a saved index "covers different chunks" | [Vector search — a stale saved index](#vector-search--a-stale-saved-index) |
 | `retrieve` says a batch or question "was served by" another host | [Vector search — more than one host](#vector-search--more-than-one-host) |
 | `retrieve` refuses to start because the estimate exceeds the limit | [Vector search — the estimate is over the limit](#vector-search--the-estimate-is-over-the-limit) |
@@ -317,6 +318,23 @@ until its failure modes are listed here.
   cannot be attributed to a specific model after the fact.
 - **Prevented or caught by:** nothing automatic yet. A configuration check rejecting
   alias ids belongs with the generator's configuration in the next phase.
+
+---
+
+### Model calls — the network dropped
+
+- **What fails:** the machine running the harness loses its connection partway through
+  a long run.
+- **Symptom:** "could not be reached: Remote end closed connection without response",
+  then `getaddrinfo failed` (Windows error 11001: the computer could not even look up
+  openrouter.ai), on every attempt.
+- **Look first:** your own connection, not the code or the gateway.
+- **Fix / recover:** run the same command again once the connection is back. Every
+  batch that finished is cached, so the run resumes where it stopped and pays only for
+  what is left.
+- **Prevented or caught by:** each call is tried five times, waiting 2, 4, 8 and 16
+  seconds between tries, which rides out drops shorter than about half a minute.
+  `tests/test_llm.py::test_a_connection_that_drops_mid_response_is_retried`.
 
 ---
 
