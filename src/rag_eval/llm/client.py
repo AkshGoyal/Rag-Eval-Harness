@@ -46,9 +46,19 @@ from rag_eval.llm.types import (
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 API_KEY_VARIABLE = "OPENROUTER_API_KEY"
 
-RETRYABLE_STATUSES = frozenset({408, 409, 429, 500, 502, 503, 504})
-"""Statuses worth trying again: rate limits, timeouts and upstream faults. A 400 or a
-401 means the request itself is wrong, and repeating it only wastes time and money."""
+RETRYABLE_CLIENT_STATUSES = frozenset({408, 409, 429})
+"""The 4xx statuses worth trying again: a timeout, a conflict and a rate limit. Any
+other 4xx means the request itself is wrong, and repeating it wastes time and money."""
+
+
+def is_retryable(status: int) -> bool:
+    """Whether a failed status is worth trying again.
+
+    Every 5xx is an upstream fault and retried, except 501 (the server does not
+    support the request at all). That includes the non-standard 520-524 that
+    Cloudflare returns when the host behind it fails, which the gateway passes on.
+    """
+    return status in RETRYABLE_CLIENT_STATUSES or (500 <= status <= 599 and status != 501)
 
 
 class ModelError(RagEvalError):
@@ -260,7 +270,7 @@ class ModelClient:
                 )
 
             failures.append(f"attempt {attempt}: HTTP {status} {_error_of(body)}")
-            if status not in RETRYABLE_STATUSES or attempt == self.max_attempts:
+            if not is_retryable(status) or attempt == self.max_attempts:
                 break
             self._wait(attempt)
 

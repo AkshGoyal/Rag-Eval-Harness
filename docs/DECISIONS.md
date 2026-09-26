@@ -845,6 +845,27 @@ Status values: `active`, `superseded by D-NNN`, `revisit — <trigger>`.
 - **When to revisit:** if the hybrid wins and the test set grows large enough to split
   into a part for tuning and a part for reporting. Only then is tuning the weights
   honest.
+- **Result (2026-09-26, seed-v2, 19 scored cases): the hybrid lost to vector search
+  alone.**
+
+  | configuration | hit@1 | hit@3 | hit@5 | hit@10 | span@5 | MRR |
+  |---|---|---|---|---|---|---|
+  | keyword (BM25) | 26% | 37% | 47% | 53% | 40% | 0.34 |
+  | OpenAI small | 26% | 53% | **74%** | **89%** | **71%** | **0.45** |
+  | hybrid, keyword + OpenAI small | 21% | 42% | 58% | 74% | 55% | 0.37 |
+
+  The likely mechanism was measured on the keyword side, where it can be checked
+  offline. Every question names its contract, so keyword search mostly returns
+  **the right contract but the wrong page**. For case 0014, 14 of keyword search's top
+  20 chunks come from the right contract, and the answer sits at rank 16. If vector
+  search also ranks that contract's other pages moderately, those pages collect votes
+  from both lists and outrank an answer that vector search alone put near the top.
+  This is the risk named above. The vector side of the mechanism is confirmed when
+  `compare` shows each case's rankings.
+
+  The method is kept, not tuned. Trying other constants or depths until one wins on
+  these 19 cases would fit the noise. A variant is worth testing once the test set is
+  large enough to hold out cases for tuning.
 - **Date:** 2026-09-24
 
 ---

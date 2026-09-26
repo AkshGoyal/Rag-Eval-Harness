@@ -230,6 +230,26 @@ def test_a_rate_limit_is_retried_and_the_attempts_are_recorded(tmp_path: Path) -
     assert record.attempts == 2, "a retry that is not counted hides an unstable provider"
 
 
+@pytest.mark.parametrize("status", [500, 502, 503, 504, 520, 522, 524])
+def test_an_upstream_fault_is_retried(tmp_path: Path, status: int) -> None:
+    """520 is Cloudflare's "the host behind me failed"; it reached a real build."""
+    transport = FakeTransport([(status, {"error": "upstream"}), (200, _chat_body())])
+
+    record = _client(tmp_path, transport).chat(_request()).record
+
+    assert record.attempts == 2
+
+
+@pytest.mark.parametrize("status", [400, 401, 402, 403, 404, 501])
+def test_a_request_that_cannot_succeed_is_not_retried(tmp_path: Path, status: int) -> None:
+    transport = FakeTransport([(status, {"error": "no"})])
+
+    with pytest.raises(ModelError):
+        _client(tmp_path, transport).chat(_request())
+
+    assert transport.calls == 1
+
+
 def test_a_bad_request_is_not_retried(tmp_path: Path) -> None:
     """Repeating a malformed request only wastes time and money."""
     transport = FakeTransport([(400, {"error": {"message": "bad model"}})])

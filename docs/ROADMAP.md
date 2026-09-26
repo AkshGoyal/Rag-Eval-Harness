@@ -2,10 +2,11 @@
 
 **Current phase:** Phase 6 — Retrieval metrics (all three configurations run; the paired comparison is next)
 **Last updated:** 2026-09-24
-**Next action:** Aksh runs four configurations on seed-v2: keyword, OpenAI small,
-Qwen 8B (rebuilt on one host, D-013, about $0.06) and hybrid keyword + OpenAI small
-(D-014, free). After that: build `compare`, which saves each run, shows case-by-case
-flips and runs a paired significance test.
+**Next action:** Aksh reruns Qwen 8B on seed-v2. Its first attempt stopped on an HTTP 520
+from the pinned host, which is now retried. Keyword, OpenAI small and hybrid results on
+seed-v2 are recorded in D-014; the hybrid lost to vector search alone. After Qwen:
+build `compare`, which saves each run, shows case-by-case flips and runs a paired
+significance test.
 
 This is a proposal. Phases, their contents, and their order are all open to challenge
 under §1.6 of `CLAUDE.md`.
