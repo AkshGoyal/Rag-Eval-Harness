@@ -124,6 +124,8 @@ uv run python -m rag_eval check-models            # two calls, a fraction of a r
 Varying **only** chunk size, everything else fixed, measuring how often retrieval finds
 the passage containing the answer:
 
+![Retrieval recall by chunk size: recall@1 peaks at 4k characters, recall@5 and recall@10 keep rising](docs/media/chunk-size-recall.svg)
+
 | Chunk size | Chunks | recall@1 | recall@5 | recall@10 |
 |---|---|---|---|---|
 | 1,000 chars | 30,578 | 21% | 47% | 53% |
